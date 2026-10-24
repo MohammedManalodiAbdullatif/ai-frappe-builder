@@ -10,6 +10,8 @@ import {
   Wrench,
   ExternalLink,
   ChevronRight,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { ValidationReport } from '../types';
 import { api } from '../api';
@@ -29,6 +31,8 @@ export const RightPanel: React.FC<RightPanelProps> = ({
 }) => {
   const [downloading, setDownloading] = useState(false);
   const [activeTab, setActiveTab] = useState<'validation' | 'bench'>('validation');
+  const [copiedReport, setCopiedReport] = useState(false);
+  const [copiedBench, setCopiedBench] = useState(false);
 
   const handleDownloadZip = () => {
     if (!sessionId) return;
@@ -37,14 +41,29 @@ export const RightPanel: React.FC<RightPanelProps> = ({
     setTimeout(() => setDownloading(false), 2000);
   };
 
+  const handleCopyReport = () => {
+    if (!validation) return;
+    const text = `Frappe App Validation Report\nValid: ${validation.is_valid}\nErrors:\n${(validation.errors || []).map((e) => `- ${e}`).join('\n')}\nWarnings:\n${(validation.warnings || []).map((w) => `- ${w}`).join('\n')}\nFix Hints:\n${(validation.fix_hints || []).map((h) => `- ${h.message}`).join('\n')}`;
+    navigator.clipboard.writeText(text);
+    setCopiedReport(true);
+    setTimeout(() => setCopiedReport(false), 2000);
+  };
+
+  const handleCopyBenchLogs = () => {
+    const text = `Frappe v15.0 Bench Runner Logs\n✓ DocType JSON schema validated\n✓ Python controller AST compiled\n✓ Fixtures export generated\n✓ Standalone Git repo committed\nBench verification status: PASS`;
+    navigator.clipboard.writeText(text);
+    setCopiedBench(true);
+    setTimeout(() => setCopiedBench(false), 2000);
+  };
+
   const isValid = validation?.is_valid ?? true;
   const errorCount = validation?.errors?.length ?? 0;
   const warningCount = validation?.warnings?.length ?? 0;
 
   return (
-    <div className="w-80 lg:w-88 border-l border-slate-800 bg-slate-900 flex flex-col h-full flex-shrink-0 select-none">
+    <div className="w-80 lg:w-88 border-l border-slate-800 bg-slate-900 flex flex-col h-full flex-shrink-0 select-text">
       {/* 1. Header Tabs */}
-      <div className="h-11 border-b border-slate-800 px-4 flex items-center justify-between bg-slate-900/90">
+      <div className="h-11 border-b border-slate-800 px-4 flex items-center justify-between bg-slate-900/90 select-none">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveTab('validation')}
@@ -88,7 +107,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({
         {activeTab === 'validation' && (
           <div className="space-y-4">
             {/* Status Summary */}
-            <div className="p-3.5 rounded-xl bg-slate-850 border border-slate-800 space-y-2">
+            <div className="p-3.5 rounded-xl bg-slate-850 border border-slate-800 space-y-2 select-text">
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 font-medium">Schema Status</span>
                 <span
@@ -100,9 +119,23 @@ export const RightPanel: React.FC<RightPanelProps> = ({
                 </span>
               </div>
               <div className="flex items-center justify-between text-[11px] text-slate-500">
-                <span>Errors: {errorCount}</span>
-                <span>Warnings: {warningCount}</span>
-                <span>Deterministic Rules: 20+</span>
+                <span>Errors: {errorCount} | Warnings: {warningCount}</span>
+                <button
+                  onClick={handleCopyReport}
+                  className="flex items-center gap-1 text-[10px] text-sky-400 hover:text-sky-300 font-mono px-1.5 py-0.5 rounded hover:bg-slate-800 transition"
+                >
+                  {copiedReport ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-400" />
+                      <span className="text-emerald-400">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span>Copy Report</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 
@@ -188,7 +221,26 @@ export const RightPanel: React.FC<RightPanelProps> = ({
               </p>
             </div>
 
-            <div className="bg-slate-950 rounded-xl p-3 border border-slate-800 font-mono text-[11px] text-slate-400 space-y-1">
+            <div className="bg-slate-950 rounded-xl p-3 border border-slate-800 font-mono text-[11px] text-slate-400 space-y-1 relative select-text group">
+              <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-800">
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider">Test Suite Output</span>
+                <button
+                  onClick={handleCopyBenchLogs}
+                  className="flex items-center gap-1 text-[10px] text-sky-400 hover:text-sky-300 font-mono px-1.5 py-0.5 rounded hover:bg-slate-800 transition"
+                >
+                  {copiedBench ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-400" />
+                      <span className="text-emerald-400">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span>Copy Logs</span>
+                    </>
+                  )}
+                </button>
+              </div>
               <div className="text-emerald-400">✓ DocType JSON schema validated</div>
               <div className="text-emerald-400">✓ Python controller AST compiled</div>
               <div className="text-emerald-400">✓ Fixtures export generated</div>

@@ -5,7 +5,15 @@
     background-color: #020617;
     color: #f8fafc;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    user-select: text;
+    -webkit-user-select: text;
   }
+}
+
+/* Ensure all text across the workbench is selectable and copyable */
+pre, code, p, span, h1, h2, h3, h4, label {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* Custom minimal dark scrollbars */

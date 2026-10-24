@@ -7,6 +7,8 @@ import {
   Tag,
   CircleDashed,
   Cpu,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { Message, PipelineStage, InterviewQuestion } from '../types';
 
@@ -38,6 +40,8 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({
   onSendMessage,
 }) => {
   const [inputText, setInputText] = useState('');
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [copiedQuestion, setCopiedQuestion] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -45,6 +49,20 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, activeQuestion]);
+
+  const handleCopyMessage = (id: string, text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedMsgId(id);
+    setTimeout(() => setCopiedMsgId(null), 2000);
+  };
+
+  const handleCopyActiveQuestion = (q: InterviewQuestion) => {
+    const opts = q.options.map((o) => (typeof o === 'string' ? o : `${o.label}: ${o.value}`)).join('\n');
+    const fullText = `${q.question}\n\n${q.reason ? `Why it matters: ${q.reason}\n\n` : ''}Options:\n${opts}`;
+    navigator.clipboard.writeText(fullText);
+    setCopiedQuestion(true);
+    setTimeout(() => setCopiedQuestion(false), 2000);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,9 +84,9 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({
   const currentIdx = getStageIndex(stage);
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800 w-80 lg:w-96 flex-shrink-0 select-none">
+    <div className="flex flex-col h-full bg-slate-900 border-r border-slate-800 w-80 lg:w-96 flex-shrink-0 select-text">
       {/* 1. Header & Stepper */}
-      <div className="p-4 border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-10">
+      <div className="p-4 border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-10 select-none">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-sky-400" />
@@ -115,22 +133,33 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({
       </div>
 
       {/* 2. Chat Stream */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 font-sans text-sm">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 font-sans text-sm select-text">
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`flex flex-col ${
+            className={`flex flex-col group ${
               msg.role === 'user' ? 'items-end' : 'items-start'
             }`}
           >
             <div
-              className={`max-w-[88%] rounded-xl px-3.5 py-2.5 leading-relaxed text-sm ${
+              className={`relative max-w-[88%] rounded-xl px-3.5 py-2.5 leading-relaxed text-sm select-text ${
                 msg.role === 'user'
                   ? 'bg-sky-600 text-white rounded-br-none shadow-sm'
                   : 'bg-slate-800/90 text-slate-200 border border-slate-700/60 rounded-bl-none shadow-sm'
               }`}
             >
-              <div className="whitespace-pre-wrap">{msg.content}</div>
+              <div className="whitespace-pre-wrap select-text pr-5">{msg.content}</div>
+              <button
+                onClick={() => handleCopyMessage(msg.id, msg.content)}
+                title="Copy message to clipboard"
+                className="opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2 p-1 rounded bg-slate-900/80 hover:bg-slate-950 text-slate-400 hover:text-white"
+              >
+                {copiedMsgId === msg.id ? (
+                  <Check className="w-3 h-3 text-emerald-400" />
+                ) : (
+                  <Copy className="w-3 h-3" />
+                )}
+              </button>
             </div>
             <span className="text-[10px] text-slate-500 mt-1 px-1">
               {msg.timestamp || 'just now'}
@@ -140,19 +169,32 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({
 
         {/* Active Discovery Question Card */}
         {activeQuestion && (
-          <div className="bg-slate-800/90 border border-sky-500/40 rounded-xl p-3.5 shadow-lg shadow-sky-950/20">
-            <div className="flex items-start gap-2 mb-2">
-              <HelpCircle className="w-4 h-4 text-sky-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-slate-100 leading-snug">
-                  {activeQuestion.question}
-                </p>
-                {activeQuestion.reason && (
-                  <p className="text-xs text-slate-400 mt-1">
-                    {activeQuestion.reason}
+          <div className="bg-slate-800/90 border border-sky-500/40 rounded-xl p-3.5 shadow-lg shadow-sky-950/20 select-text">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="flex items-start gap-2">
+                <HelpCircle className="w-4 h-4 text-sky-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-slate-100 leading-snug select-text">
+                    {activeQuestion.question}
                   </p>
-                )}
+                  {activeQuestion.reason && (
+                    <p className="text-xs text-slate-400 mt-1 select-text">
+                      {activeQuestion.reason}
+                    </p>
+                  )}
+                </div>
               </div>
+              <button
+                onClick={() => handleCopyActiveQuestion(activeQuestion)}
+                title="Copy question and options"
+                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-700/50 flex-shrink-0 transition"
+              >
+                {copiedQuestion ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+              </button>
             </div>
 
             {/* Interactive Option Pills */}

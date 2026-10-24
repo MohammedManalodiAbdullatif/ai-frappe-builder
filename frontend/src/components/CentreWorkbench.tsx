@@ -34,6 +34,21 @@ export const CentreWorkbench: React.FC<CentreWorkbenchProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('erd');
   const [selectedDocType, setSelectedDocType] = useState<DocTypeSpec | null>(null);
   const [copiedJson, setCopiedJson] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  const handleCopyCode = () => {
+    if (!fileContent) return;
+    navigator.clipboard.writeText(fileContent);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  const handleCopyJson = () => {
+    const jsonStr = JSON.stringify(specRaw || app, null, 2);
+    navigator.clipboard.writeText(jsonStr);
+    setCopiedJson(true);
+    setTimeout(() => setCopiedJson(false), 2000);
+  };
 
   // File tree state
   const [fileTree, setFileTree] = useState<FileNode | null>(null);
@@ -90,12 +105,6 @@ export const CentreWorkbench: React.FC<CentreWorkbenchProps> = ({
         setFileContent(`// Error reading file: ${err.message}`);
         setLoadingFile(false);
       });
-  };
-
-  const handleCopyJson = () => {
-    navigator.clipboard.writeText(JSON.stringify(specRaw || app, null, 2));
-    setCopiedJson(true);
-    setTimeout(() => setCopiedJson(false), 2000);
   };
 
   return (
@@ -440,30 +449,40 @@ export const CentreWorkbench: React.FC<CentreWorkbenchProps> = ({
 
             {/* TAB 4: FILES & CODE */}
             {activeTab === 'code' && (
-              <div className="flex h-full">
+              <div className="flex h-full select-text">
                 {/* File Tree Sidebar */}
-                <div className="w-64 border-r border-slate-800 bg-slate-900/60 p-3 overflow-y-auto font-mono text-xs select-none">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                <div className="w-64 border-r border-slate-800 bg-slate-900/60 p-3 overflow-y-auto font-mono text-xs select-text">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-3 select-none">
                     Package Hierarchy
                   </div>
                   {fileTree && renderTreeNode(fileTree, selectedFilePath, handleSelectFile)}
                 </div>
 
                 {/* Code Viewer */}
-                <div className="flex-1 bg-slate-950 p-4 flex flex-col font-mono text-xs overflow-auto">
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-slate-400">
-                    <span>{selectedFilePath || 'Select a file'}</span>
+                <div className="flex-1 bg-slate-950 p-4 flex flex-col font-mono text-xs overflow-auto select-text">
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-slate-400 select-none">
+                    <span className="font-semibold text-slate-300">{selectedFilePath || 'Select a file'}</span>
                     <button
-                      onClick={() => navigator.clipboard.writeText(fileContent)}
-                      className="px-2 py-0.5 hover:text-white transition"
+                      onClick={handleCopyCode}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white transition"
                     >
-                      Copy
+                      {copiedCode ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-emerald-400">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-sky-400" />
+                          <span>Copy Code</span>
+                        </>
+                      )}
                     </button>
                   </div>
                   {loadingFile ? (
                     <div className="text-slate-500 py-8 text-center">Loading file...</div>
                   ) : (
-                    <pre className="text-slate-300 leading-relaxed overflow-auto flex-1">
+                    <pre className="text-slate-300 leading-relaxed overflow-auto flex-1 select-text">
                       {fileContent}
                     </pre>
                   )}
@@ -473,8 +492,29 @@ export const CentreWorkbench: React.FC<CentreWorkbenchProps> = ({
 
             {/* TAB 5: SPEC JSON */}
             {activeTab === 'json' && (
-              <div className="p-6">
-                <pre className="p-4 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-slate-300 overflow-auto max-h-[calc(100vh-180px)]">
+              <div className="p-6 select-text space-y-3">
+                <div className="flex items-center justify-between select-none">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Frappe AppSpec 2.0 Contract
+                  </span>
+                  <button
+                    onClick={handleCopyJson}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:bg-slate-850 text-slate-200 hover:text-white transition text-xs font-medium shadow-sm"
+                  >
+                    {copiedJson ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-400">Copied Spec</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 text-sky-400" />
+                        <span>Copy JSON Spec</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                <pre className="p-4 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-slate-300 overflow-auto max-h-[calc(100vh-220px)] select-text">
                   {JSON.stringify(specRaw || app, null, 2)}
                 </pre>
               </div>
