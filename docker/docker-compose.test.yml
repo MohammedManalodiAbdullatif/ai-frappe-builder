@@ -1,0 +1,47 @@
+services:
+  mariadb:
+    image: mariadb:10.6
+    environment:
+      MYSQL_ROOT_PASSWORD: admin
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --skip-innodb-read-only-compressed
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-padmin"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis-cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  redis-queue:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  bench:
+    build:
+      context: .
+      dockerfile: Dockerfile.bench
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis-cache:
+        condition: service_started
+      redis-queue:
+        condition: service_started
+    environment:
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_PASSWORD: admin
+    volumes:
+      - /tmp/frappe_exports:/workspace/apps
+    command: tail -f /dev/null
+
+volumes:
+  mariadb_data:

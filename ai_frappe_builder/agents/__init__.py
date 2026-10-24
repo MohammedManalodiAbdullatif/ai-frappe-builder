@@ -12,6 +12,7 @@ from ai_frappe_builder.agents.orchestrator import (
     OrchestratorSession,
     OrchestratorState,
 )
+from ai_frappe_builder.agents.qa import QAAgent, QAInput, QAReport
 
 __all__ = [
     "ArchitectAgent",
@@ -27,4 +28,7 @@ __all__ = [
     "Orchestrator",
     "OrchestratorSession",
     "OrchestratorState",
+    "QAAgent",
+    "QAInput",
+    "QAReport",
 ]

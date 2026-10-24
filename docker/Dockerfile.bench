@@ -1,0 +1,11 @@
+FROM frappe/bench:v15.0.0
+
+USER frappe
+WORKDIR /home/frappe/frappe-bench
+
+# Pre-install ERPNext v15 and setup local testing site
+RUN bench init --skip-redis-config-generation --frappe-branch version-15 /home/frappe/frappe-bench || true
+
+WORKDIR /home/frappe/frappe-bench
+EXPOSE 8000
+CMD ["bench", "start"]
