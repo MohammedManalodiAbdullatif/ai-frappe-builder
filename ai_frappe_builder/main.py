@@ -12,6 +12,16 @@ Endpoints:
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Ensure ai_frappe_builder directory is in sys.path for both package and direct execution
+_pkg_dir = str(Path(__file__).resolve().parent)
+_root_dir = str(Path(__file__).resolve().parent.parent)
+for p in [_pkg_dir, _root_dir]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
 import json
 import logging
 from contextlib import asynccontextmanager
