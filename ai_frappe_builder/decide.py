@@ -13,10 +13,10 @@ If EXPERIENTIAL_API_KEY is not configured, it gracefully falls back to determini
 from __future__ import annotations
 
 import logging
-from typing import Any, Literal
+from typing import Any, Literal, cast
 import httpx
 
-from config import get_settings
+from ai_frappe_builder.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,8 @@ async def call_jev(state: dict[str, Any], questions: dict[str, dict[str, Any]]) 
             resp.raise_for_status()
             data = resp.json()
             # Jev returns answers mapped by question id
-            return data.get("answers", data)
+            answers = data.get("answers", data)
+            return cast(dict[str, Any], answers if isinstance(answers, dict) else {})
     except Exception as exc:
         logger.warning("Jev request failed (%s) — falling back to heuristics", exc)
         return _heuristic_fallback(state, questions)
@@ -123,19 +124,20 @@ async def choose_archetype(client_text: str) -> str:
         }
     }
     res = await call_jev({"client_text": client_text}, questions)
-    return res.get("archetype", "daily_rental")
+    val = res.get("archetype", "daily_rental")
+    return str(val) if val else "daily_rental"
 
 
 async def judge_spec_gate(spec_dict: dict[str, Any], site_context: dict[str, Any]) -> dict[str, Any]:
     """
     Run the Jev spec gate fuzzy checks (duplicates, workflow reachability, submittable flags).
     """
-    slimmed_state = {
-        "doctypes": [dt.get("name") for dt in spec_dict.get("doctypes", [])],
-        "existing_site_doctypes": [dt.get("name") for dt in site_context.get("doctypes", [])],
+    slimmed_state: dict[str, Any] = {
+        "doctypes": [dt.get("name") for dt in spec_dict.get("doctypes", []) if isinstance(dt, dict)],
+        "existing_site_doctypes": [dt.get("name") for dt in site_context.get("doctypes", []) if isinstance(dt, dict)],
     }
 
-    questions = {
+    questions: dict[str, Any] = {
         "has_duplicate_doctypes": {
             "type": "noul",
             "instructions": "A doctype in the spec duplicates an existing core doctype from the site.",
@@ -149,8 +151,8 @@ async def judge_spec_gate(spec_dict: dict[str, Any], site_context: dict[str, Any
 
     res = await call_jev(slimmed_state, questions)
     return {
-        "has_duplicates": res.get("has_duplicate_doctypes", False),
-        "readiness_score": res.get("spec_readiness", "Ship-ready"),
+        "has_duplicates": bool(res.get("has_duplicate_doctypes", False)),
+        "readiness_score": str(res.get("spec_readiness", "Ship-ready")),
     }
 
 
@@ -174,4 +176,5 @@ async def pick_script_pattern(purpose: str, doctype_fields: list[str]) -> str:
         }
     }
     res = await call_jev({"purpose": purpose, "fields": doctype_fields}, questions)
-    return res.get("pattern", "overlap_check")
+    pattern_val = res.get("pattern", "overlap_check")
+    return str(pattern_val) if pattern_val else "overlap_check"

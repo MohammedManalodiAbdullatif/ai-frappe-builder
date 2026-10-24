@@ -1,0 +1,257 @@
+# Frappe v15 Fieldtypes Knowledge Catalog
+# Authoritative reference for field validation and schema generation
+
+version: "15.0"
+fieldtypes:
+  Data:
+    category: data
+    requires_options: false
+    allowed_options: ["Email", "Phone", "URL", "Name", null]
+    supports_in_list_view: true
+    supports_in_standard_filter: true
+    description: "Single-line short text up to 140 chars by default"
+
+  Link:
+    category: relation
+    requires_options: true
+    options_description: "Target DocType name (must exist in spec or core catalogue)"
+    supports_in_list_view: true
+    supports_in_standard_filter: true
+    description: "Foreign key pointer to another DocType"
+
+  Dynamic Link:
+    category: relation
+    requires_options: true
+    options_description: "Fieldname of a Link field pointing to DocType within the same DocType"
+    supports_in_list_view: true
+    supports_in_standard_filter: false
+    description: "Polymorphic link where target DocType is dynamically determined by another field"
+
+  Table:
+    category: relation
+    requires_options: true
+    options_description: "Child DocType name with istable: 1"
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Embedded 1-to-many child table grid"
+
+  Table MultiSelect:
+    category: relation
+    requires_options: true
+    options_description: "Child DocType with exactly one Link field"
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Tag-like multi-select storing rows in child table"
+
+  Select:
+    category: data
+    requires_options: true
+    options_description: "Newline-separated list of string options"
+    supports_in_list_view: true
+    supports_in_standard_filter: true
+    description: "Dropdown select menu"
+
+  Currency:
+    category: numeric
+    requires_options: false
+    options_description: "Currency fieldname or Company:company:default_currency"
+    supports_in_list_view: true
+    supports_in_standard_filter: false
+    description: "Monetary amount formatted according to site currency precision"
+
+  Float:
+    category: numeric
+    requires_options: false
+    supports_in_list_view: true
+    supports_in_standard_filter: false
+    description: "Floating-point decimal number"
+
+  Int:
+    category: numeric
+    requires_options: false
+    supports_in_list_view: true
+    supports_in_standard_filter: true
+    description: "Integer value"
+
+  Percent:
+    category: numeric
+    requires_options: false
+    supports_in_list_view: true
+    supports_in_standard_filter: false
+    description: "Percentage value"
+
+  Check:
+    category: data
+    requires_options: false
+    supports_in_list_view: true
+    supports_in_standard_filter: true
+    description: "Boolean 0 or 1 checkbox"
+
+  Date:
+    category: data
+    requires_options: false
+    supports_in_list_view: true
+    supports_in_standard_filter: true
+    description: "Calendar date YYYY-MM-DD"
+
+  Datetime:
+    category: data
+    requires_options: false
+    supports_in_list_view: true
+    supports_in_standard_filter: true
+    description: "Timestamp YYYY-MM-DD HH:MM:SS"
+
+  Time:
+    category: data
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Time HH:MM:SS"
+
+  Duration:
+    category: data
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Time interval in seconds/hours"
+
+  Small Text:
+    category: text
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Multi-line text area up to ~1KB"
+
+  Text:
+    category: text
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Medium text area up to ~64KB"
+
+  Long Text:
+    category: text
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Unlimited long text storage"
+
+  Text Editor:
+    category: text
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Rich text WYSIWYG editor"
+
+  Markdown Editor:
+    category: text
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Markdown input with live preview"
+
+  Code:
+    category: text
+    requires_options: false
+    options_description: "Programming language (Python, JavaScript, JSON, HTML, CSS)"
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Code editor with syntax highlighting"
+
+  JSON:
+    category: text
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Structured JSON payload"
+
+  Attach:
+    category: attachment
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "File attachment upload"
+
+  Attach Image:
+    category: attachment
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Image upload with thumbnail preview"
+
+  Signature:
+    category: attachment
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Digital pad signature capture"
+
+  Barcode:
+    category: data
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Barcode or QR code scanner input"
+
+  Color:
+    category: data
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Hex color picker"
+
+  Rating:
+    category: numeric
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Star rating widget (1-5)"
+
+  Geolocation:
+    category: data
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Leaflet map coordinate picker"
+
+  Read Only:
+    category: data
+    requires_options: false
+    supports_in_list_view: true
+    supports_in_standard_filter: false
+    description: "Non-editable calculated or fetched value"
+
+  Section Break:
+    category: layout
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Visual container dividing form sections"
+
+  Column Break:
+    category: layout
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Divides form into multi-column layout"
+
+  Tab Break:
+    category: layout
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Creates horizontal tabs at the top of the form"
+
+  Heading:
+    category: layout
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Text header inside a section"
+
+  Button:
+    category: layout
+    requires_options: false
+    supports_in_list_view: false
+    supports_in_standard_filter: false
+    description: "Trigger action button"

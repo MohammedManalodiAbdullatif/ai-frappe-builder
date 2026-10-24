@@ -1,0 +1,291 @@
+# ERPNext Standard DocTypes Catalog
+# Reference for Link validation, schema generation, and entity reuse without duplication
+
+version: "15.0"
+standard_doctypes:
+  Customer:
+    module: "Selling"
+    is_submittable: false
+    title_field: "customer_name"
+    search_fields: ["customer_name", "customer_group", "territory"]
+    standard_fields:
+      - { fieldname: "customer_name", label: "Customer Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "customer_group", label: "Customer Group", fieldtype: "Link", options: "Customer Group", reqd: 1 }
+      - { fieldname: "territory", label: "Territory", fieldtype: "Link", options: "Territory", reqd: 1 }
+      - { fieldname: "customer_type", label: "Customer Type", fieldtype: "Select", options: "Company\nIndividual" }
+      - { fieldname: "default_currency", label: "Billing Currency", fieldtype: "Link", options: "Currency" }
+
+  Supplier:
+    module: "Buying"
+    is_submittable: false
+    title_field: "supplier_name"
+    search_fields: ["supplier_name", "supplier_group"]
+    standard_fields:
+      - { fieldname: "supplier_name", label: "Supplier Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "supplier_group", label: "Supplier Group", fieldtype: "Link", options: "Supplier Group", reqd: 1 }
+      - { fieldname: "supplier_type", label: "Supplier Type", fieldtype: "Select", options: "Company\nIndividual" }
+      - { fieldname: "country", label: "Country", fieldtype: "Link", options: "Country" }
+
+  Item:
+    module: "Stock"
+    is_submittable: false
+    title_field: "item_name"
+    search_fields: ["item_code", "item_name", "item_group"]
+    standard_fields:
+      - { fieldname: "item_code", label: "Item Code", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "item_name", label: "Item Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "item_group", label: "Item Group", fieldtype: "Link", options: "Item Group", reqd: 1 }
+      - { fieldname: "stock_uom", label: "Default Unit of Measure", fieldtype: "Link", options: "UOM", reqd: 1 }
+      - { fieldname: "is_stock_item", label: "Maintain Stock", fieldtype: "Check" }
+      - { fieldname: "is_sales_item", label: "Allow Sales", fieldtype: "Check" }
+      - { fieldname: "is_purchase_item", label: "Allow Purchase", fieldtype: "Check" }
+
+  Item Group:
+    module: "Stock"
+    is_submittable: false
+    title_field: "item_group_name"
+    standard_fields:
+      - { fieldname: "item_group_name", label: "Item Group Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "parent_item_group", label: "Parent Item Group", fieldtype: "Link", options: "Item Group" }
+      - { fieldname: "is_group", label: "Is Group", fieldtype: "Check" }
+
+  Company:
+    module: "Setup"
+    is_submittable: false
+    title_field: "company_name"
+    search_fields: ["company_name", "abbr"]
+    standard_fields:
+      - { fieldname: "company_name", label: "Company Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "abbr", label: "Abbreviation", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "default_currency", label: "Default Currency", fieldtype: "Link", options: "Currency", reqd: 1 }
+      - { fieldname: "country", label: "Country", fieldtype: "Link", options: "Country", reqd: 1 }
+
+  User:
+    module: "Core"
+    is_submittable: false
+    title_field: "full_name"
+    search_fields: ["email", "first_name", "last_name"]
+    standard_fields:
+      - { fieldname: "email", label: "Email", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "first_name", label: "First Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "last_name", label: "Last Name", fieldtype: "Data" }
+      - { fieldname: "enabled", label: "Enabled", fieldtype: "Check" }
+
+  Employee:
+    module: "HR"
+    is_submittable: false
+    title_field: "employee_name"
+    search_fields: ["employee_name", "department", "designation"]
+    standard_fields:
+      - { fieldname: "employee_name", label: "Employee Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "company", label: "Company", fieldtype: "Link", options: "Company", reqd: 1 }
+      - { fieldname: "department", label: "Department", fieldtype: "Link", options: "Department" }
+      - { fieldname: "designation", label: "Designation", fieldtype: "Link", options: "Designation" }
+      - { fieldname: "user_id", label: "User ID", fieldtype: "Link", options: "User" }
+
+  Department:
+    module: "HR"
+    is_submittable: false
+    title_field: "department_name"
+    standard_fields:
+      - { fieldname: "department_name", label: "Department Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "company", label: "Company", fieldtype: "Link", options: "Company" }
+      - { fieldname: "parent_department", label: "Parent Department", fieldtype: "Link", options: "Department" }
+
+  Warehouse:
+    module: "Stock"
+    is_submittable: false
+    title_field: "warehouse_name"
+    standard_fields:
+      - { fieldname: "warehouse_name", label: "Warehouse Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "company", label: "Company", fieldtype: "Link", options: "Company", reqd: 1 }
+      - { fieldname: "parent_warehouse", label: "Parent Warehouse", fieldtype: "Link", options: "Warehouse" }
+      - { fieldname: "is_group", label: "Is Group", fieldtype: "Check" }
+
+  Account:
+    module: "Accounts"
+    is_submittable: false
+    title_field: "account_name"
+    standard_fields:
+      - { fieldname: "account_name", label: "Account Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "company", label: "Company", fieldtype: "Link", options: "Company", reqd: 1 }
+      - { fieldname: "root_type", label: "Root Type", fieldtype: "Select", options: "Asset\nLiability\nIncome\nExpense\nEquity" }
+      - { fieldname: "account_currency", label: "Account Currency", fieldtype: "Link", options: "Currency" }
+
+  Cost Center:
+    module: "Accounts"
+    is_submittable: false
+    title_field: "cost_center_name"
+    standard_fields:
+      - { fieldname: "cost_center_name", label: "Cost Center Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "company", label: "Company", fieldtype: "Link", options: "Company", reqd: 1 }
+      - { fieldname: "parent_cost_center", label: "Parent Cost Center", fieldtype: "Link", options: "Cost Center" }
+
+  Sales Order:
+    module: "Selling"
+    is_submittable: true
+    title_field: "customer"
+    standard_fields:
+      - { fieldname: "customer", label: "Customer", fieldtype: "Link", options: "Customer", reqd: 1 }
+      - { fieldname: "transaction_date", label: "Date", fieldtype: "Date", reqd: 1 }
+      - { fieldname: "delivery_date", label: "Delivery Date", fieldtype: "Date" }
+      - { fieldname: "grand_total", label: "Grand Total", fieldtype: "Currency" }
+
+  Sales Invoice:
+    module: "Accounts"
+    is_submittable: true
+    title_field: "customer"
+    standard_fields:
+      - { fieldname: "customer", label: "Customer", fieldtype: "Link", options: "Customer", reqd: 1 }
+      - { fieldname: "posting_date", label: "Posting Date", fieldtype: "Date", reqd: 1 }
+      - { fieldname: "due_date", label: "Due Date", fieldtype: "Date" }
+      - { fieldname: "grand_total", label: "Grand Total", fieldtype: "Currency" }
+      - { fieldname: "outstanding_amount", label: "Outstanding Amount", fieldtype: "Currency" }
+
+  Purchase Order:
+    module: "Buying"
+    is_submittable: true
+    title_field: "supplier"
+    standard_fields:
+      - { fieldname: "supplier", label: "Supplier", fieldtype: "Link", options: "Supplier", reqd: 1 }
+      - { fieldname: "transaction_date", label: "Date", fieldtype: "Date", reqd: 1 }
+      - { fieldname: "grand_total", label: "Grand Total", fieldtype: "Currency" }
+
+  Purchase Invoice:
+    module: "Accounts"
+    is_submittable: true
+    title_field: "supplier"
+    standard_fields:
+      - { fieldname: "supplier", label: "Supplier", fieldtype: "Link", options: "Supplier", reqd: 1 }
+      - { fieldname: "posting_date", label: "Posting Date", fieldtype: "Date", reqd: 1 }
+      - { fieldname: "grand_total", label: "Grand Total", fieldtype: "Currency" }
+
+  Stock Entry:
+    module: "Stock"
+    is_submittable: true
+    title_field: "stock_entry_type"
+    standard_fields:
+      - { fieldname: "stock_entry_type", label: "Purpose", fieldtype: "Select", options: "Material Issue\nMaterial Receipt\nMaterial Transfer\nManufacture\nRepack" }
+      - { fieldname: "posting_date", label: "Posting Date", fieldtype: "Date", reqd: 1 }
+      - { fieldname: "from_warehouse", label: "From Warehouse", fieldtype: "Link", options: "Warehouse" }
+      - { fieldname: "to_warehouse", label: "To Warehouse", fieldtype: "Link", options: "Warehouse" }
+
+  Payment Entry:
+    module: "Accounts"
+    is_submittable: true
+    title_field: "party_name"
+    standard_fields:
+      - { fieldname: "payment_type", label: "Payment Type", fieldtype: "Select", options: "Receive\nPay\nInternal Transfer", reqd: 1 }
+      - { fieldname: "party_type", label: "Party Type", fieldtype: "Select", options: "Customer\nSupplier\nEmployee\nMember" }
+      - { fieldname: "party", label: "Party", fieldtype: "Dynamic Link", options: "party_type" }
+      - { fieldname: "paid_amount", label: "Paid Amount", fieldtype: "Currency", reqd: 1 }
+
+  Project:
+    module: "Projects"
+    is_submittable: false
+    title_field: "project_name"
+    standard_fields:
+      - { fieldname: "project_name", label: "Project Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "customer", label: "Customer", fieldtype: "Link", options: "Customer" }
+      - { fieldname: "status", label: "Status", fieldtype: "Select", options: "Open\nCompleted\nCancelled" }
+
+  Task:
+    module: "Projects"
+    is_submittable: false
+    title_field: "subject"
+    standard_fields:
+      - { fieldname: "subject", label: "Subject", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "project", label: "Project", fieldtype: "Link", options: "Project" }
+      - { fieldname: "status", label: "Status", fieldtype: "Select", options: "Open\nWorking\nPending Review\nCompleted\nCancelled" }
+      - { fieldname: "priority", label: "Priority", fieldtype: "Select", options: "Low\nMedium\nHigh\nUrgent" }
+
+  Lead:
+    module: "CRM"
+    is_submittable: false
+    title_field: "lead_name"
+    standard_fields:
+      - { fieldname: "lead_name", label: "Lead Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "email_id", label: "Email Address", fieldtype: "Data" }
+      - { fieldname: "mobile_no", label: "Mobile No", fieldtype: "Data" }
+      - { fieldname: "status", label: "Status", fieldtype: "Select", options: "Lead\nOpen\nReplied\nOpportunity\nQuotation\nLostDoc\nConverted" }
+
+  Address:
+    module: "Contacts"
+    is_submittable: false
+    title_field: "address_title"
+    standard_fields:
+      - { fieldname: "address_title", label: "Address Title", fieldtype: "Data" }
+      - { fieldname: "address_type", label: "Address Type", fieldtype: "Select", options: "Billing\nShipping\nOffice\nPersonal\nPlant\nPostal\nShop\nSubsidiary\nWarehouse\nOther" }
+      - { fieldname: "address_line1", label: "Address Line 1", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "city", label: "City", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "country", label: "Country", fieldtype: "Link", options: "Country", reqd: 1 }
+
+  Contact:
+    module: "Contacts"
+    is_submittable: false
+    title_field: "first_name"
+    standard_fields:
+      - { fieldname: "first_name", label: "First Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "last_name", label: "Last Name", fieldtype: "Data" }
+      - { fieldname: "email_id", label: "Email Address", fieldtype: "Data" }
+      - { fieldname: "phone", label: "Phone", fieldtype: "Data" }
+
+  Currency:
+    module: "Geo"
+    is_submittable: false
+    title_field: "currency_name"
+    standard_fields:
+      - { fieldname: "currency_name", label: "Currency Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "symbol", label: "Symbol", fieldtype: "Data" }
+
+  Country:
+    module: "Geo"
+    is_submittable: false
+    title_field: "country_name"
+    standard_fields:
+      - { fieldname: "country_name", label: "Country Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "code", label: "Code", fieldtype: "Data" }
+
+  UOM:
+    module: "Stock"
+    is_submittable: false
+    title_field: "uom_name"
+    standard_fields:
+      - { fieldname: "uom_name", label: "UOM Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "must_be_whole_number", label: "Must Be Whole Number", fieldtype: "Check" }
+
+  Territory:
+    module: "Setup"
+    is_submittable: false
+    title_field: "territory_name"
+    standard_fields:
+      - { fieldname: "territory_name", label: "Territory Name", fieldtype: "Data", reqd: 1 }
+      - { fieldname: "parent_territory", label: "Parent Territory", fieldtype: "Link", options: "Territory" }
+
+  Customer Group:
+    module: "Setup"
+    is_submittable: false
+    title_field: "customer_group_name"
+    standard_fields:
+      - { fieldname: "customer_group_name", label: "Customer Group Name", fieldtype: "Data", reqd: 1 }
+
+  Supplier Group:
+    module: "Setup"
+    is_submittable: false
+    title_field: "supplier_group_name"
+    standard_fields:
+      - { fieldname: "supplier_group_name", label: "Supplier Group Name", fieldtype: "Data", reqd: 1 }
+
+  Branch:
+    module: "Setup"
+    is_submittable: false
+    title_field: "branch"
+    standard_fields:
+      - { fieldname: "branch", label: "Branch", fieldtype: "Data", reqd: 1 }
+
+  Designation:
+    module: "HR"
+    is_submittable: false
+    title_field: "designation_name"
+    standard_fields:
+      - { fieldname: "designation_name", label: "Designation Name", fieldtype: "Data", reqd: 1 }

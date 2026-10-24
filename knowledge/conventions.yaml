@@ -1,0 +1,98 @@
+# Frappe v15 Naming, Schema & Permission Conventions
+version: "15.0"
+
+naming_conventions:
+  doctype:
+    case_pattern: "^[A-Z][a-zA-Z0-9]*(\\s[A-Z0-9][a-zA-Z0-9]*)*$"
+    description: "Title Case with single spaces between alphanumeric words"
+    max_length: 60
+    min_length: 2
+
+  field:
+    pattern: "^[a-z][a-z0-9_]*$"
+    description: "lowercase_snake_case starting with a letter"
+    max_length: 64
+    min_length: 1
+
+  role:
+    pattern: "^[A-Z][a-zA-Z0-9\\s_-]+$"
+    description: "Title Case role identifier"
+    max_length: 60
+
+autoname_patterns:
+  valid_schemes:
+    - scheme: "series"
+      pattern: "^[A-Z0-9\\-_]+-\\.(#+|##+|###+|####+|#####+)$"
+      examples: ["RENT-.#####", "PO-.YYYY.-.#####", "CAR-.###"]
+      description: "Auto-incrementing prefix with numeric hashes"
+    - scheme: "field"
+      pattern: "^field:[a-z0-9_]+$"
+      examples: ["field:vehicle_id", "field:license_plate"]
+      description: "Inherit document name directly from unique field"
+    - scheme: "format"
+      pattern: "^format:.+$"
+      examples: ["format:{item_code}-{customer}", "format:{prefix}-{###}"]
+      description: "Composite template using braces for field substitutions"
+    - scheme: "hash"
+      pattern: "^hash$"
+      examples: ["hash"]
+      description: "10-character random hash (standard for Child Tables)"
+    - scheme: "autoincrement"
+      pattern: "^autoincrement$"
+      examples: ["autoincrement"]
+      description: "Native DB auto-increment integer ID"
+    - scheme: "prompt"
+      pattern: "^Prompt$"
+      examples: ["Prompt"]
+      description: "User is asked for name on document creation"
+
+reserved_fieldnames:
+  - "name"
+  - "owner"
+  - "creation"
+  - "modified"
+  - "modified_by"
+  - "docstatus"
+  - "idx"
+  - "parent"
+  - "parentfield"
+  - "parenttype"
+  - "_user_tags"
+  - "_comments"
+  - "_assign"
+  - "_liked_by"
+  - "doctype"
+
+default_roles:
+  system_manager:
+    name: "System Manager"
+    read: 1
+    write: 1
+    create: 1
+    delete: 1
+    submit: 1
+    cancel: 1
+    amend: 1
+    report: 1
+    export: 1
+    import: 1
+    share: 1
+    print: 1
+    email: 1
+
+  all_user:
+    name: "All"
+    read: 1
+    write: 0
+    create: 0
+    delete: 0
+
+doctype_flags:
+  child_table:
+    istable: 1
+    autoname: "hash"
+    is_submittable: false
+  single:
+    issingle: 1
+    istable: 0
+    is_submittable: false

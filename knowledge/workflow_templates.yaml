@@ -1,0 +1,105 @@
+# Frappe v15 Workflow Templates
+version: "15.0"
+
+templates:
+  three_state_approval:
+    name: "Standard Three-State Approval"
+    workflow_state_field: "workflow_state"
+    states:
+      - state: "Draft"
+        doc_status: 0
+        allow_edit: "All"
+      - state: "Pending Approval"
+        doc_status: 0
+        allow_edit: "System Manager"
+      - state: "Approved"
+        doc_status: 1
+        allow_edit: "System Manager"
+      - state: "Rejected"
+        doc_status: 0
+        allow_edit: "System Manager"
+    transitions:
+      - state: "Draft"
+        action: "Submit for Approval"
+        next_state: "Pending Approval"
+        allowed: "All"
+      - state: "Pending Approval"
+        action: "Approve"
+        next_state: "Approved"
+        allowed: "System Manager"
+      - state: "Pending Approval"
+        action: "Reject"
+        next_state: "Rejected"
+        allowed: "System Manager"
+      - state: "Rejected"
+        action: "Reopen"
+        next_state: "Draft"
+        allowed: "All"
+
+  four_state_enterprise:
+    name: "Enterprise Multi-Tier Review"
+    workflow_state_field: "workflow_state"
+    states:
+      - state: "Draft"
+        doc_status: 0
+        allow_edit: "All"
+      - state: "Pending Review"
+        doc_status: 0
+        allow_edit: "Reviewer"
+      - state: "Pending Approval"
+        doc_status: 0
+        allow_edit: "Approver"
+      - state: "Approved"
+        doc_status: 1
+        allow_edit: "System Manager"
+      - state: "Rejected"
+        doc_status: 0
+        allow_edit: "Reviewer"
+    transitions:
+      - state: "Draft"
+        action: "Request Review"
+        next_state: "Pending Review"
+        allowed: "All"
+      - state: "Pending Review"
+        action: "Forward to Approver"
+        next_state: "Pending Approval"
+        allowed: "Reviewer"
+      - state: "Pending Review"
+        action: "Send Back"
+        next_state: "Draft"
+        allowed: "Reviewer"
+      - state: "Pending Approval"
+        action: "Approve"
+        next_state: "Approved"
+        allowed: "Approver"
+      - state: "Pending Approval"
+        action: "Reject"
+        next_state: "Rejected"
+        allowed: "Approver"
+      - state: "Rejected"
+        action: "Re-draft"
+        next_state: "Draft"
+        allowed: "All"
+
+  two_state_simple:
+    name: "Simple Two-State Submission"
+    workflow_state_field: "workflow_state"
+    states:
+      - state: "Draft"
+        doc_status: 0
+        allow_edit: "All"
+      - state: "Submitted"
+        doc_status: 1
+        allow_edit: "System Manager"
+      - state: "Cancelled"
+        doc_status: 2
+        allow_edit: "System Manager"
+    transitions:
+      - state: "Draft"
+        action: "Submit"
+        next_state: "Submitted"
+        allowed: "All"
+      - state: "Submitted"
+        action: "Cancel"
+        next_state: "Cancelled"
+        allowed: "System Manager"

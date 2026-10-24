@@ -1,0 +1,1144 @@
+{
+  "$defs": {
+    "AppMetadata": {
+      "description": "Complete installable app package definition.",
+      "properties": {
+        "app_name": {
+          "description": "snake_case app directory name, e.g. 'car_rental'",
+          "title": "App Name",
+          "type": "string"
+        },
+        "title": {
+          "description": "Human-readable title, e.g. 'Car Rental'",
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "default": "Custom Frappe application generated with AI Frappe Builder",
+          "title": "Description",
+          "type": "string"
+        },
+        "publisher": {
+          "default": "Frappe Builder",
+          "title": "Publisher",
+          "type": "string"
+        },
+        "email": {
+          "default": "developer@example.com",
+          "title": "Email",
+          "type": "string"
+        },
+        "license": {
+          "default": "MIT",
+          "title": "License",
+          "type": "string"
+        },
+        "version": {
+          "default": "0.0.1",
+          "title": "Version",
+          "type": "string"
+        },
+        "frappe_version": {
+          "default": "15.0.0",
+          "title": "Frappe Version",
+          "type": "string"
+        },
+        "requires_erpnext": {
+          "default": false,
+          "title": "Requires Erpnext",
+          "type": "boolean"
+        },
+        "modules": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Modules",
+          "type": "array"
+        },
+        "roles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Roles",
+          "type": "array"
+        },
+        "doctypes": {
+          "items": {
+            "$ref": "#/$defs/DocTypeSpec"
+          },
+          "title": "Doctypes",
+          "type": "array"
+        },
+        "workflows": {
+          "items": {
+            "$ref": "#/$defs/WorkflowSpec"
+          },
+          "title": "Workflows",
+          "type": "array"
+        },
+        "server_scripts": {
+          "items": {
+            "$ref": "#/$defs/ServerScriptSpec"
+          },
+          "title": "Server Scripts",
+          "type": "array"
+        },
+        "client_scripts": {
+          "items": {
+            "$ref": "#/$defs/ClientScriptSpec"
+          },
+          "title": "Client Scripts",
+          "type": "array"
+        },
+        "reports": {
+          "items": {
+            "$ref": "#/$defs/ReportSpec"
+          },
+          "title": "Reports",
+          "type": "array"
+        },
+        "number_cards": {
+          "items": {
+            "$ref": "#/$defs/NumberCardSpec"
+          },
+          "title": "Number Cards",
+          "type": "array"
+        },
+        "dashboard_charts": {
+          "items": {
+            "$ref": "#/$defs/DashboardChartSpec"
+          },
+          "title": "Dashboard Charts",
+          "type": "array"
+        },
+        "workspaces": {
+          "items": {
+            "$ref": "#/$defs/WorkspaceSpec"
+          },
+          "title": "Workspaces",
+          "type": "array"
+        }
+      },
+      "required": [
+        "app_name",
+        "title"
+      ],
+      "title": "AppMetadata",
+      "type": "object"
+    },
+    "ClientScriptSpec": {
+      "description": "Specification for a Frappe Desk Client Script (JavaScript).",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "reference_doctype": {
+          "title": "Reference Doctype",
+          "type": "string"
+        },
+        "view": {
+          "default": "Form",
+          "title": "View",
+          "type": "string"
+        },
+        "purpose": {
+          "default": "UI enhancement",
+          "title": "Purpose",
+          "type": "string"
+        },
+        "pattern": {
+          "default": "custom",
+          "title": "Pattern",
+          "type": "string"
+        },
+        "script": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Script"
+        }
+      },
+      "required": [
+        "name",
+        "reference_doctype"
+      ],
+      "title": "ClientScriptSpec",
+      "type": "object"
+    },
+    "DashboardChartSpec": {
+      "description": "Specification for a Desk Dashboard Chart.",
+      "properties": {
+        "chart_name": {
+          "title": "Chart Name",
+          "type": "string"
+        },
+        "chart_type": {
+          "default": "Bar",
+          "title": "Chart Type",
+          "type": "string"
+        },
+        "document_type": {
+          "title": "Document Type",
+          "type": "string"
+        },
+        "based_on": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Based On"
+        },
+        "value_based_on": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Based On"
+        },
+        "group_by_type": {
+          "default": "Count",
+          "title": "Group By Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "chart_name",
+        "document_type"
+      ],
+      "title": "DashboardChartSpec",
+      "type": "object"
+    },
+    "DocTypeKind": {
+      "enum": [
+        "master",
+        "transaction",
+        "child",
+        "settings",
+        "log"
+      ],
+      "title": "DocTypeKind",
+      "type": "string"
+    },
+    "DocTypeSpec": {
+      "description": "Full specification for one Frappe DocType.",
+      "properties": {
+        "name": {
+          "description": "Title Case singular name, e.g. 'Rental Agreement'",
+          "title": "Name",
+          "type": "string"
+        },
+        "module": {
+          "default": "Custom",
+          "title": "Module",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/DocTypeKind",
+          "default": "master"
+        },
+        "istable": {
+          "default": false,
+          "title": "Istable",
+          "type": "boolean"
+        },
+        "is_submittable": {
+          "default": false,
+          "title": "Is Submittable",
+          "type": "boolean"
+        },
+        "is_single": {
+          "default": false,
+          "title": "Is Single",
+          "type": "boolean"
+        },
+        "track_changes": {
+          "default": false,
+          "title": "Track Changes",
+          "type": "boolean"
+        },
+        "autoname": {
+          "default": "Prompt",
+          "description": "naming_series: RA-.YYYY.-.##### | field:fieldname | hash | autoincrement | Prompt",
+          "title": "Autoname",
+          "type": "string"
+        },
+        "naming_rule": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Naming Rule"
+        },
+        "naming_series_options": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Naming Series Options"
+        },
+        "title_field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title Field"
+        },
+        "search_fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Search Fields",
+          "type": "array"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/FieldSpec"
+          },
+          "title": "Fields",
+          "type": "array"
+        },
+        "permissions": {
+          "items": {
+            "$ref": "#/$defs/PermissionSpec"
+          },
+          "title": "Permissions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "DocTypeSpec",
+      "type": "object"
+    },
+    "FieldSpec": {
+      "description": "Specification for a single DocType field.",
+      "properties": {
+        "fieldname": {
+          "description": "snake_case identifier",
+          "title": "Fieldname",
+          "type": "string"
+        },
+        "label": {
+          "description": "Human-readable label shown in Desk UI",
+          "title": "Label",
+          "type": "string"
+        },
+        "fieldtype": {
+          "description": "Frappe field type string",
+          "title": "Fieldtype",
+          "type": "string"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For Link: target DocType. For Table: child DocType with istable=1. For Select: newline-separated values. For Dynamic Link: fieldname of doctype.",
+          "title": "Options"
+        },
+        "reqd": {
+          "default": false,
+          "title": "Reqd",
+          "type": "boolean"
+        },
+        "unique": {
+          "default": false,
+          "title": "Unique",
+          "type": "boolean"
+        },
+        "read_only": {
+          "default": false,
+          "title": "Read Only",
+          "type": "boolean"
+        },
+        "hidden": {
+          "default": false,
+          "title": "Hidden",
+          "type": "boolean"
+        },
+        "in_list_view": {
+          "default": false,
+          "title": "In List View",
+          "type": "boolean"
+        },
+        "in_standard_filter": {
+          "default": false,
+          "title": "In Standard Filter",
+          "type": "boolean"
+        },
+        "in_global_search": {
+          "default": false,
+          "title": "In Global Search",
+          "type": "boolean"
+        },
+        "bold": {
+          "default": false,
+          "title": "Bold",
+          "type": "boolean"
+        },
+        "allow_in_quick_entry": {
+          "default": false,
+          "title": "Allow In Quick Entry",
+          "type": "boolean"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default"
+        },
+        "fetch_from": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Fetch From"
+        },
+        "depends_on": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Depends On"
+        },
+        "mandatory_depends_on": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mandatory Depends On"
+        },
+        "read_only_depends_on": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Read Only Depends On"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "precision": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Precision"
+        }
+      },
+      "required": [
+        "fieldname",
+        "label",
+        "fieldtype"
+      ],
+      "title": "FieldSpec",
+      "type": "object"
+    },
+    "InterviewQuestion": {
+      "description": "A single discovery question crafted by the Interviewer agent.",
+      "properties": {
+        "id": {
+          "description": "Stable question key, e.g. 'q_b2b_vs_b2c'",
+          "title": "Id",
+          "type": "string"
+        },
+        "question": {
+          "title": "Question",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/QuestionOption"
+          },
+          "title": "Options",
+          "type": "array"
+        },
+        "allows_custom": {
+          "default": true,
+          "title": "Allows Custom",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "question"
+      ],
+      "title": "InterviewQuestion",
+      "type": "object"
+    },
+    "NumberCardSpec": {
+      "description": "Specification for a Desk Metric Number Card.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "document_type": {
+          "title": "Document Type",
+          "type": "string"
+        },
+        "function": {
+          "default": "Count",
+          "title": "Function",
+          "type": "string"
+        },
+        "aggregate_function_based_on": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Aggregate Function Based On"
+        },
+        "filters_json": {
+          "default": "[]",
+          "title": "Filters Json",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "label",
+        "document_type"
+      ],
+      "title": "NumberCardSpec",
+      "type": "object"
+    },
+    "PermissionSpec": {
+      "description": "Role-level permissions row for a DocType.",
+      "properties": {
+        "role": {
+          "title": "Role",
+          "type": "string"
+        },
+        "read": {
+          "default": true,
+          "title": "Read",
+          "type": "boolean"
+        },
+        "write": {
+          "default": false,
+          "title": "Write",
+          "type": "boolean"
+        },
+        "create": {
+          "default": false,
+          "title": "Create",
+          "type": "boolean"
+        },
+        "delete": {
+          "default": false,
+          "title": "Delete",
+          "type": "boolean"
+        },
+        "submit": {
+          "default": false,
+          "title": "Submit",
+          "type": "boolean"
+        },
+        "cancel": {
+          "default": false,
+          "title": "Cancel",
+          "type": "boolean"
+        },
+        "amend": {
+          "default": false,
+          "title": "Amend",
+          "type": "boolean"
+        },
+        "report": {
+          "default": false,
+          "title": "Report",
+          "type": "boolean"
+        },
+        "export": {
+          "default": false,
+          "title": "Export",
+          "type": "boolean"
+        },
+        "import": {
+          "default": false,
+          "title": "Import",
+          "type": "boolean"
+        },
+        "share": {
+          "default": false,
+          "title": "Share",
+          "type": "boolean"
+        },
+        "print": {
+          "default": false,
+          "title": "Print",
+          "type": "boolean"
+        },
+        "email": {
+          "default": false,
+          "title": "Email",
+          "type": "boolean"
+        },
+        "permlevel": {
+          "default": 0,
+          "title": "Permlevel",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "title": "PermissionSpec",
+      "type": "object"
+    },
+    "QuestionOption": {
+      "description": "An interactive selectable option presented to the user during discovery.",
+      "properties": {
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        }
+      },
+      "required": [
+        "label",
+        "value"
+      ],
+      "title": "QuestionOption",
+      "type": "object"
+    },
+    "ReportSpec": {
+      "description": "Specification for a Frappe Script or Query Report.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "ref_doctype": {
+          "title": "Ref Doctype",
+          "type": "string"
+        },
+        "report_type": {
+          "default": "Script Report",
+          "title": "Report Type",
+          "type": "string"
+        },
+        "columns": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Columns",
+          "type": "array"
+        },
+        "filters": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Filters",
+          "type": "array"
+        },
+        "script": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Script"
+        },
+        "query": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Query"
+        }
+      },
+      "required": [
+        "name",
+        "ref_doctype"
+      ],
+      "title": "ReportSpec",
+      "type": "object"
+    },
+    "ServerScriptSpec": {
+      "description": "Specification for a Frappe Server Script / Controller Hook.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "script_type": {
+          "default": "DocType Event",
+          "title": "Script Type",
+          "type": "string"
+        },
+        "reference_doctype": {
+          "title": "Reference Doctype",
+          "type": "string"
+        },
+        "doctype_event": {
+          "default": "Before Save",
+          "title": "Doctype Event",
+          "type": "string"
+        },
+        "purpose": {
+          "default": "Custom logic",
+          "title": "Purpose",
+          "type": "string"
+        },
+        "pattern": {
+          "default": "custom",
+          "title": "Pattern",
+          "type": "string"
+        },
+        "script": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Script"
+        }
+      },
+      "required": [
+        "name",
+        "reference_doctype"
+      ],
+      "title": "ServerScriptSpec",
+      "type": "object"
+    },
+    "WorkflowSpec": {
+      "description": "Full Frappe Workflow definition.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "doctype": {
+          "title": "Doctype",
+          "type": "string"
+        },
+        "workflow_state_field": {
+          "default": "workflow_state",
+          "title": "Workflow State Field",
+          "type": "string"
+        },
+        "is_active": {
+          "default": true,
+          "title": "Is Active",
+          "type": "boolean"
+        },
+        "send_email_alert": {
+          "default": false,
+          "title": "Send Email Alert",
+          "type": "boolean"
+        },
+        "states": {
+          "items": {
+            "$ref": "#/$defs/WorkflowState"
+          },
+          "title": "States",
+          "type": "array"
+        },
+        "transitions": {
+          "items": {
+            "$ref": "#/$defs/WorkflowTransition"
+          },
+          "title": "Transitions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "doctype"
+      ],
+      "title": "WorkflowSpec",
+      "type": "object"
+    },
+    "WorkflowState": {
+      "description": "Single state in a Frappe Workflow.",
+      "properties": {
+        "state": {
+          "title": "State",
+          "type": "string"
+        },
+        "doc_status": {
+          "default": 0,
+          "description": "0=Draft, 1=Submitted, 2=Cancelled",
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Doc Status",
+          "type": "integer"
+        },
+        "allow_edit": {
+          "default": "System Manager",
+          "description": "Role allowed to edit in this state",
+          "title": "Allow Edit",
+          "type": "string"
+        },
+        "is_optional_state": {
+          "default": false,
+          "title": "Is Optional State",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "title": "WorkflowState",
+      "type": "object"
+    },
+    "WorkflowTransition": {
+      "description": "Transition edge between two workflow states.",
+      "properties": {
+        "state": {
+          "description": "Source state",
+          "title": "State",
+          "type": "string"
+        },
+        "action": {
+          "description": "Action trigger button label",
+          "title": "Action",
+          "type": "string"
+        },
+        "next_state": {
+          "description": "Target state",
+          "title": "Next State",
+          "type": "string"
+        },
+        "allow_role": {
+          "default": "System Manager",
+          "description": "Role allowed to trigger transition",
+          "title": "Allow Role",
+          "type": "string"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition"
+        }
+      },
+      "required": [
+        "state",
+        "action",
+        "next_state"
+      ],
+      "title": "WorkflowTransition",
+      "type": "object"
+    },
+    "WorkspaceLink": {
+      "description": "Sidebar / group navigation link on a Frappe Workspace.",
+      "properties": {
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "link_to": {
+          "title": "Link To",
+          "type": "string"
+        },
+        "link_type": {
+          "default": "DocType",
+          "title": "Link Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "link_to"
+      ],
+      "title": "WorkspaceLink",
+      "type": "object"
+    },
+    "WorkspaceShortcut": {
+      "description": "Shortcut item on a Frappe Workspace.",
+      "properties": {
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "type": {
+          "default": "DocType",
+          "title": "Type",
+          "type": "string"
+        },
+        "link_to": {
+          "title": "Link To",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "link_to"
+      ],
+      "title": "WorkspaceShortcut",
+      "type": "object"
+    },
+    "WorkspaceSpec": {
+      "description": "Frappe Desk Module Workspace.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "module": {
+          "title": "Module",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "icon": {
+          "default": "package",
+          "title": "Icon",
+          "type": "string"
+        },
+        "shortcuts": {
+          "items": {
+            "$ref": "#/$defs/WorkspaceShortcut"
+          },
+          "title": "Shortcuts",
+          "type": "array"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/WorkspaceLink"
+          },
+          "title": "Links",
+          "type": "array"
+        },
+        "charts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Charts",
+          "type": "array"
+        },
+        "number_cards": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Number Cards",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "module",
+        "label",
+        "title"
+      ],
+      "title": "WorkspaceSpec",
+      "type": "object"
+    }
+  },
+  "description": "Central contract and single source of truth for the generation pipeline.",
+  "properties": {
+    "spec_version": {
+      "const": "2.0",
+      "default": "2.0",
+      "title": "Spec Version",
+      "type": "string"
+    },
+    "status": {
+      "default": "needs_input",
+      "enum": [
+        "ready",
+        "needs_input",
+        "drafting",
+        "validating",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "archetype": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Archetype"
+    },
+    "questions": {
+      "items": {
+        "$ref": "#/$defs/InterviewQuestion"
+      },
+      "title": "Questions",
+      "type": "array"
+    },
+    "assumptions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Assumptions",
+      "type": "array"
+    },
+    "app": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AppMetadata"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "AppSpecV2",
+  "type": "object"
+}
