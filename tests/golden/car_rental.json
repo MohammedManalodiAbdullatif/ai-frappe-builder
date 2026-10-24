@@ -1,0 +1,123 @@
+{
+  "spec_version": "2.0",
+  "status": "ready",
+  "archetype": "car_rental",
+  "assumptions": [
+    "Vehicle pricing is calculated per day",
+    "Security deposit required upon booking",
+    "Customer records link to standard ERPNext Customer"
+  ],
+  "app": {
+    "app_name": "car_rental",
+    "title": "Car Rental System",
+    "description": "Comprehensive fleet rental management system",
+    "publisher": "Frappe Builder",
+    "email": "fleet@example.com",
+    "license": "MIT",
+    "version": "1.0.0",
+    "requires_erpnext": true,
+    "modules": ["Fleet"],
+    "roles": ["Fleet Manager", "Rental Agent"],
+    "doctypes": [
+      {
+        "name": "Rental Addon Item",
+        "module": "Fleet",
+        "istable": true,
+        "autoname": "hash",
+        "fields": [
+          {"fieldname": "addon_name", "label": "Addon Name", "fieldtype": "Data", "reqd": true},
+          {"fieldname": "daily_rate", "label": "Daily Rate", "fieldtype": "Currency", "reqd": true},
+          {"fieldname": "qty", "label": "Quantity", "fieldtype": "Int", "default": "1"},
+          {"fieldname": "amount", "label": "Total Amount", "fieldtype": "Currency"}
+        ],
+        "permissions": []
+      },
+      {
+        "name": "Rental Vehicle",
+        "module": "Fleet",
+        "istable": false,
+        "is_submittable": false,
+        "autoname": "field:license_plate",
+        "title_field": "license_plate",
+        "fields": [
+          {"fieldname": "license_plate", "label": "License Plate", "fieldtype": "Data", "reqd": true, "unique": true},
+          {"fieldname": "make", "label": "Make", "fieldtype": "Data", "reqd": true},
+          {"fieldname": "model", "label": "Model", "fieldtype": "Data", "reqd": true},
+          {"fieldname": "status", "label": "Status", "fieldtype": "Select", "options": "Available\nRented\nMaintenance\nRetired"},
+          {"fieldname": "daily_rate", "label": "Standard Daily Rate", "fieldtype": "Currency", "reqd": true}
+        ],
+        "permissions": [
+          {"role": "System Manager", "read": true, "write": true, "create": true, "delete": true},
+          {"role": "Fleet Manager", "read": true, "write": true, "create": true, "delete": false}
+        ]
+      },
+      {
+        "name": "Rental Agreement",
+        "module": "Fleet",
+        "istable": false,
+        "is_submittable": true,
+        "autoname": "Prompt",
+        "fields": [
+          {"fieldname": "customer", "label": "Customer", "fieldtype": "Link", "options": "Customer", "reqd": true},
+          {"fieldname": "vehicle", "label": "Rental Vehicle", "fieldtype": "Link", "options": "Rental Vehicle", "reqd": true},
+          {"fieldname": "start_date", "label": "Rental Start Date", "fieldtype": "Date", "reqd": true},
+          {"fieldname": "end_date", "label": "Rental End Date", "fieldtype": "Date", "reqd": true},
+          {"fieldname": "addons", "label": "Addon Equipment", "fieldtype": "Table", "options": "Rental Addon Item"},
+          {"fieldname": "grand_total", "label": "Grand Total", "fieldtype": "Currency"}
+        ],
+        "permissions": [
+          {"role": "System Manager", "read": true, "write": true, "create": true, "delete": true, "submit": true, "cancel": true},
+          {"role": "Rental Agent", "read": true, "write": true, "create": true, "delete": false, "submit": true}
+        ]
+      }
+    ],
+    "workflows": [
+      {
+        "name": "Rental Agreement Workflow",
+        "document_type": "Rental Agreement",
+        "workflow_state_field": "workflow_state",
+        "states": [
+          {"state": "Draft", "doc_status": 0, "allow_edit": "Rental Agent"},
+          {"state": "Active", "doc_status": 1, "allow_edit": "Fleet Manager"},
+          {"state": "Closed", "doc_status": 1, "allow_edit": "Fleet Manager"}
+        ],
+        "transitions": [
+          {"state": "Draft", "action": "Activate Agreement", "next_state": "Active", "allowed": "Rental Agent"},
+          {"state": "Active", "action": "Close Rental", "next_state": "Closed", "allowed": "Fleet Manager"}
+        ]
+      }
+    ],
+    "reports": [
+      {
+        "name": "Active Fleet Rentals",
+        "ref_doctype": "Rental Agreement",
+        "report_type": "Script Report",
+        "columns": [
+          {"fieldname": "name", "label": "Agreement ID", "fieldtype": "Data", "width": 140},
+          {"fieldname": "customer", "label": "Customer", "fieldtype": "Link", "options": "Customer", "width": 180},
+          {"fieldname": "vehicle", "label": "Vehicle", "fieldtype": "Link", "options": "Rental Vehicle", "width": 140},
+          {"fieldname": "start_date", "label": "Start Date", "fieldtype": "Date", "width": 120},
+          {"fieldname": "end_date", "label": "End Date", "fieldtype": "Date", "width": 120}
+        ],
+        "filters": []
+      }
+    ],
+    "workspaces": [
+      {
+        "name": "Fleet Workspace",
+        "module": "Fleet",
+        "label": "Fleet Operations",
+        "title": "Fleet Management Desk",
+        "icon": "car",
+        "shortcuts": [
+          {"label": "New Agreement", "type": "DocType", "link_to": "Rental Agreement"},
+          {"label": "Vehicles", "type": "DocType", "link_to": "Rental Vehicle"}
+        ],
+        "links": [
+          {"label": "Rental Agreements", "link_to": "Rental Agreement", "link_type": "DocType"},
+          {"label": "Fleet Vehicles", "link_to": "Rental Vehicle", "link_type": "DocType"}
+        ]
+      }
+    ]
+  }
+}

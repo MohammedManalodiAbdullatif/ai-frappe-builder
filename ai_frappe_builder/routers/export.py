@@ -95,3 +95,57 @@ async def download_app_zip(
         media_type="application/zip",
         filename=f"{app_name}.zip",
     )
+
+
+@router.get("/{session_id}/tree")
+async def get_exported_tree(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get the directory and file tree of the exported application.
+    """
+    spec_row = await get_current_spec(db, session_id)
+    if not spec_row:
+        raise HTTPException(status_code=404, detail="No spec found for this session")
+
+    spec_dict = json.loads(spec_row.spec_json) if isinstance(spec_row.spec_json, str) else spec_row.spec_json
+    app_name = spec_dict.get("app", {}).get("app_name", "custom_app")
+
+    from ai_frappe_builder.services.exporter import FrappeAppExporter
+
+    exporter = FrappeAppExporter()
+    try:
+        return exporter.get_file_tree(app_name)
+    except FileNotFoundError:
+        # Generate export if not already on disk
+        await export_app(spec_dict)
+        return exporter.get_file_tree(app_name)
+
+
+@router.get("/{session_id}/file")
+async def get_exported_file_content(
+    session_id: str,
+    path: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Retrieve raw file content for a given path inside the exported app.
+    """
+    spec_row = await get_current_spec(db, session_id)
+    if not spec_row:
+        raise HTTPException(status_code=404, detail="No spec found for this session")
+
+    spec_dict = json.loads(spec_row.spec_json) if isinstance(spec_row.spec_json, str) else spec_row.spec_json
+    app_name = spec_dict.get("app", {}).get("app_name", "custom_app")
+
+    from ai_frappe_builder.services.exporter import FrappeAppExporter
+
+    exporter = FrappeAppExporter()
+    try:
+        content = exporter.read_exported_file(app_name, path)
+        return {"path": path, "content": content}
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"File '{path}' not found.")
+    except PermissionError as pe:
+        raise HTTPException(status_code=403, detail=str(pe))

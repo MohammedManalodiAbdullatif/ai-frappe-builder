@@ -1,0 +1,65 @@
+{
+  "spec_version": "2.0",
+  "status": "ready",
+  "archetype": "school",
+  "assumptions": [
+    "Academy registers student course enrollments",
+    "Instructors link to standard ERPNext Employee"
+  ],
+  "app": {
+    "app_name": "school_academy",
+    "title": "Academy Student System",
+    "description": "Student enrollment and curriculum grading app",
+    "publisher": "Frappe Builder",
+    "email": "academy@example.com",
+    "license": "MIT",
+    "version": "1.0.0",
+    "requires_erpnext": true,
+    "modules": ["Education"],
+    "roles": ["Academic Registrar", "Instructor"],
+    "doctypes": [
+      {
+        "name": "Course Module Item",
+        "module": "Education",
+        "istable": true,
+        "autoname": "hash",
+        "fields": [
+          {"fieldname": "module_title", "label": "Module Title", "fieldtype": "Data", "reqd": true},
+          {"fieldname": "credit_hours", "label": "Credit Hours", "fieldtype": "Int", "default": "3"},
+          {"fieldname": "grade_letter", "label": "Grade Letter", "fieldtype": "Select", "options": "A\nB\nC\nD\nF"}
+        ],
+        "permissions": []
+      },
+      {
+        "name": "Student Enrollment",
+        "module": "Education",
+        "istable": false,
+        "is_submittable": true,
+        "autoname": "Prompt",
+        "fields": [
+          {"fieldname": "student_name", "label": "Student Name", "fieldtype": "Data", "reqd": true},
+          {"fieldname": "instructor", "label": "Assigned Instructor", "fieldtype": "Link", "options": "Employee", "reqd": true},
+          {"fieldname": "enrollment_date", "label": "Enrollment Date", "fieldtype": "Date", "reqd": true},
+          {"fieldname": "modules", "label": "Enrolled Modules", "fieldtype": "Table", "options": "Course Module Item"}
+        ],
+        "permissions": [
+          {"role": "System Manager", "read": true, "write": true, "create": true, "delete": true, "submit": true},
+          {"role": "Academic Registrar", "read": true, "write": true, "create": true, "delete": false, "submit": true}
+        ]
+      }
+    ],
+    "workflows": [
+      {
+        "name": "Enrollment Approval",
+        "document_type": "Student Enrollment",
+        "states": [
+          {"state": "Pending Review", "doc_status": 0, "allow_edit": "Academic Registrar"},
+          {"state": "Enrolled", "doc_status": 1, "allow_edit": "Academic Registrar"}
+        ],
+        "transitions": [
+          {"state": "Pending Review", "action": "Confirm Enrollment", "next_state": "Enrolled", "allowed": "Academic Registrar"}
+        ]
+      }
+    ]
+  }
+}

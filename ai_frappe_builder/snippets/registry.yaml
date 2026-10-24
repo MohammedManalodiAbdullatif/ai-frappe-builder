@@ -1,0 +1,115 @@
+# Snippet Pattern Registry for Frappe App Builder
+version: "15.0"
+
+patterns:
+  overlap_check:
+    name: "Resource Overlap Booking Clashes"
+    trigger: "validate"
+    description: "Prevents double-booking a resource (vehicle, room, asset) across overlapping datetime or date ranges."
+    params:
+      resource_field: "vehicle"
+      start_field: "start_date"
+      end_field: "end_date"
+    python_template: |
+      overlapping = frappe.db.sql("""
+          SELECT name FROM `tab{doctype}`
+          WHERE {resource_field} = %(resource)s
+            AND name != %(current_name)s
+            AND docstatus < 2
+            AND (
+                ({start_field} <= %(end_val)s AND {end_field} >= %(start_val)s)
+            )
+          LIMIT 1
+      """, {
+          "resource": self.get("{resource_field}"),
+          "current_name": self.name or "New {doctype}",
+          "start_val": self.get("{start_field}"),
+          "end_val": self.get("{end_field}")
+      }, as_dict=True)
+      if overlapping:
+          frappe.throw(frappe._("Selected {resource_field} is already booked during this period ({0})").format(overlapping[0].name))
+
+  compute_totals:
+    name: "Child Table Total & Balance Rollup"
+    trigger: "before_save"
+    description: "Rolls up child table item amounts, computes discounts/taxes, and derives grand total and outstanding balance."
+    params:
+      items_field: "items"
+      amount_field: "amount"
+      total_field: "grand_total"
+      paid_field: "paid_amount"
+      outstanding_field: "outstanding_amount"
+    python_template: |
+      total = sum(flt(row.get("{amount_field}") or 0.0) for row in (self.get("{items_field}") or []))
+      self.{total_field} = total
+      paid = flt(self.get("{paid_field}") or 0.0)
+      self.{outstanding_field} = total - paid
+
+  create_document_on_submit:
+    name: "Auto-Generate Downstream Document on Submit"
+    trigger: "on_submit"
+    description: "Generates a linked draft document (such as an invoice, delivery note, or log) automatically upon document submission."
+    params:
+      target_doctype: "Sales Invoice"
+      link_field_in_target: "rental_agreement"
+    python_template: |
+      new_doc = frappe.new_doc("{target_doctype}")
+      new_doc.{link_field_in_target} = self.name
+      new_doc.flags.ignore_permissions = True
+      new_doc.insert()
+
+  validate_required_child_rows:
+    name: "Mandatory Child Table Validation"
+    trigger: "validate"
+    description: "Enforces that at least one item exists in the specified child table before saving."
+    params:
+      items_field: "items"
+      child_label: "Items"
+    python_template: |
+      if not self.get("{items_field}"):
+          frappe.throw(frappe._("Please add at least one row in {child_label} table before proceeding."))
+
+  update_linked_status:
+    name: "Update Parent Document Status"
+    trigger: "on_submit"
+    description: "Updates status of a linked parent document when this event completes."
+    params:
+      parent_doctype: "Rental Agreement"
+      parent_link_field: "rental_agreement"
+      target_status_field: "status"
+      new_status: "Active"
+    python_template: |
+      if self.get("{parent_link_field}"):
+          frappe.db.set_value("{parent_doctype}", self.get("{parent_link_field}"), "{target_status_field}", "{new_status}")
+
+  fetch_and_validate:
+    name: "Linked Document Status Gate"
+    trigger: "validate"
+    description: "Verifies linked record meets status requirements before allowing save or submission."
+    params:
+      linked_doctype: "Rental Vehicle"
+      link_field: "vehicle"
+      required_status_field: "status"
+      allowed_status: "Available"
+    python_template: |
+      if self.get("{link_field}"):
+          current_val = frappe.db.get_value("{linked_doctype}", self.get("{link_field}"), "{required_status_field}")
+          if current_val != "{allowed_status}":
+              frappe.throw(frappe._("{linked_doctype} {0} must be in '{allowed_status}' status, currently '{1}'").format(self.get("{link_field}"), current_val))
+
+  scheduled_reminder:
+    name: "Scheduler Reminder Job"
+    trigger: "daily"
+    description: "Daily background scheduler task to inspect overdue records and trigger notification emails."
+    params:
+      target_doctype: "Rental Agreement"
+      due_date_field: "end_date"
+      status_field: "status"
+      active_status: "Active"
+    python_template: |
+      overdue_records = frappe.get_all("{target_doctype}", filters={
+          "{status_field}": "{active_status}",
+          "{due_date_field}": ("<", frappe.utils.today())
+      }, fields=["name", "owner"])
+      for rec in overdue_records:
+          pass

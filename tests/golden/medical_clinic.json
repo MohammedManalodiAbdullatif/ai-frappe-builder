@@ -1,0 +1,66 @@
+{
+  "spec_version": "2.0",
+  "status": "ready",
+  "archetype": "medical_clinic",
+  "assumptions": [
+    "Clinic manages doctor consultations and medical prescriptions",
+    "Staff records link to standard ERPNext Employee"
+  ],
+  "app": {
+    "app_name": "medical_clinic",
+    "title": "Medical Clinic Management",
+    "description": "Patient consultation and clinical appointments app",
+    "publisher": "Frappe Builder",
+    "email": "clinic@example.com",
+    "license": "MIT",
+    "version": "1.0.0",
+    "requires_erpnext": true,
+    "modules": ["Clinical"],
+    "roles": ["Clinic Doctor", "Nurse"],
+    "doctypes": [
+      {
+        "name": "Prescription Dosage Item",
+        "module": "Clinical",
+        "istable": true,
+        "autoname": "hash",
+        "fields": [
+          {"fieldname": "medication_name", "label": "Medication", "fieldtype": "Data", "reqd": true},
+          {"fieldname": "dosage", "label": "Dosage (mg)", "fieldtype": "Data", "reqd": true},
+          {"fieldname": "frequency", "label": "Frequency", "fieldtype": "Select", "options": "Once Daily\nTwice Daily\nThree Times Daily"}
+        ],
+        "permissions": []
+      },
+      {
+        "name": "Patient Consultation",
+        "module": "Clinical",
+        "istable": false,
+        "is_submittable": true,
+        "autoname": "Prompt",
+        "fields": [
+          {"fieldname": "patient_name", "label": "Patient Full Name", "fieldtype": "Data", "reqd": true},
+          {"fieldname": "consulting_doctor", "label": "Consulting Doctor", "fieldtype": "Link", "options": "Employee", "reqd": true},
+          {"fieldname": "appointment_date", "label": "Appointment Date", "fieldtype": "Date", "reqd": true},
+          {"fieldname": "symptoms_notes", "label": "Clinical Notes", "fieldtype": "Small Text"},
+          {"fieldname": "prescriptions", "label": "Prescriptions", "fieldtype": "Table", "options": "Prescription Dosage Item"}
+        ],
+        "permissions": [
+          {"role": "System Manager", "read": true, "write": true, "create": true, "delete": true, "submit": true},
+          {"role": "Clinic Doctor", "read": true, "write": true, "create": true, "delete": false, "submit": true}
+        ]
+      }
+    ],
+    "workflows": [
+      {
+        "name": "Consultation Workflow",
+        "document_type": "Patient Consultation",
+        "states": [
+          {"state": "Waiting", "doc_status": 0, "allow_edit": "Nurse"},
+          {"state": "Completed", "doc_status": 1, "allow_edit": "Clinic Doctor"}
+        ],
+        "transitions": [
+          {"state": "Waiting", "action": "Complete Consultation", "next_state": "Completed", "allowed": "Clinic Doctor"}
+        ]
+      }
+    ]
+  }
+}

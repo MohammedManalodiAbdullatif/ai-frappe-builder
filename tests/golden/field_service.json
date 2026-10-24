@@ -1,0 +1,67 @@
+{
+  "spec_version": "2.0",
+  "status": "ready",
+  "archetype": "field_service",
+  "assumptions": [
+    "Field service technicians dispatched for onsite job tickets",
+    "Customer links to standard ERPNext Customer",
+    "Technicians link to standard ERPNext Employee"
+  ],
+  "app": {
+    "app_name": "field_service",
+    "title": "Field Service Dispatcher",
+    "description": "Technician job dispatch and onsite work log app",
+    "publisher": "Frappe Builder",
+    "email": "dispatch@example.com",
+    "license": "MIT",
+    "version": "1.0.0",
+    "requires_erpnext": true,
+    "modules": ["FieldService"],
+    "roles": ["Dispatch Coordinator", "Field Technician"],
+    "doctypes": [
+      {
+        "name": "Service Part Replaced",
+        "module": "FieldService",
+        "istable": true,
+        "autoname": "hash",
+        "fields": [
+          {"fieldname": "part_name", "label": "Part Name", "fieldtype": "Data", "reqd": true},
+          {"fieldname": "qty", "label": "Qty Used", "fieldtype": "Int", "default": "1"},
+          {"fieldname": "unit_cost", "label": "Unit Cost", "fieldtype": "Currency"}
+        ],
+        "permissions": []
+      },
+      {
+        "name": "Service Work Order",
+        "module": "FieldService",
+        "istable": false,
+        "is_submittable": true,
+        "autoname": "Prompt",
+        "fields": [
+          {"fieldname": "customer", "label": "Customer", "fieldtype": "Link", "options": "Customer", "reqd": true},
+          {"fieldname": "assigned_technician", "label": "Field Technician", "fieldtype": "Link", "options": "Employee", "reqd": true},
+          {"fieldname": "scheduled_datetime", "label": "Scheduled Window", "fieldtype": "Datetime", "reqd": true},
+          {"fieldname": "problem_description", "label": "Problem Summary", "fieldtype": "Small Text"},
+          {"fieldname": "parts_used", "label": "Parts Replaced", "fieldtype": "Table", "options": "Service Part Replaced"}
+        ],
+        "permissions": [
+          {"role": "System Manager", "read": true, "write": true, "create": true, "delete": true, "submit": true},
+          {"role": "Dispatch Coordinator", "read": true, "write": true, "create": true, "delete": false, "submit": true}
+        ]
+      }
+    ],
+    "workflows": [
+      {
+        "name": "Work Order Lifecycle",
+        "document_type": "Service Work Order",
+        "states": [
+          {"state": "Dispatched", "doc_status": 0, "allow_edit": "Dispatch Coordinator"},
+          {"state": "Job Finished", "doc_status": 1, "allow_edit": "Field Technician"}
+        ],
+        "transitions": [
+          {"state": "Dispatched", "action": "Complete Job", "next_state": "Job Finished", "allowed": "Field Technician"}
+        ]
+      }
+    ]
+  }
+}

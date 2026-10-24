@@ -1,0 +1,66 @@
+{
+  "spec_version": "2.0",
+  "status": "ready",
+  "archetype": "b2b_wholesale",
+  "assumptions": [
+    "Wholesale partner orders in tiered bulk quantities",
+    "Items reference standard ERPNext Item"
+  ],
+  "app": {
+    "app_name": "b2b_wholesale",
+    "title": "B2B Wholesale Portal",
+    "description": "High-volume B2B contract ordering system",
+    "publisher": "Frappe Builder",
+    "email": "wholesale@example.com",
+    "license": "MIT",
+    "version": "1.0.0",
+    "requires_erpnext": true,
+    "modules": ["Wholesale"],
+    "roles": ["Wholesale Manager", "Partner Agent"],
+    "doctypes": [
+      {
+        "name": "Wholesale Order Item",
+        "module": "Wholesale",
+        "istable": true,
+        "autoname": "hash",
+        "fields": [
+          {"fieldname": "item", "label": "Item", "fieldtype": "Link", "options": "Item", "reqd": true},
+          {"fieldname": "qty", "label": "Case Quantity", "fieldtype": "Int", "reqd": true},
+          {"fieldname": "tier_discount", "label": "Tier Discount Percent", "fieldtype": "Percent"},
+          {"fieldname": "line_total", "label": "Line Total", "fieldtype": "Currency"}
+        ],
+        "permissions": []
+      },
+      {
+        "name": "Wholesale Contract",
+        "module": "Wholesale",
+        "istable": false,
+        "is_submittable": true,
+        "autoname": "Prompt",
+        "fields": [
+          {"fieldname": "partner", "label": "Wholesale Partner", "fieldtype": "Link", "options": "Customer", "reqd": true},
+          {"fieldname": "effective_from", "label": "Effective From", "fieldtype": "Date", "reqd": true},
+          {"fieldname": "minimum_commitment", "label": "Minimum Annual Commitment", "fieldtype": "Currency"},
+          {"fieldname": "order_items", "label": "Contract Items", "fieldtype": "Table", "options": "Wholesale Order Item"}
+        ],
+        "permissions": [
+          {"role": "System Manager", "read": true, "write": true, "create": true, "delete": true, "submit": true},
+          {"role": "Wholesale Manager", "read": true, "write": true, "create": true, "delete": false, "submit": true}
+        ]
+      }
+    ],
+    "workflows": [
+      {
+        "name": "Wholesale Approval Workflow",
+        "document_type": "Wholesale Contract",
+        "states": [
+          {"state": "Draft", "doc_status": 0, "allow_edit": "Partner Agent"},
+          {"state": "Approved", "doc_status": 1, "allow_edit": "Wholesale Manager"}
+        ],
+        "transitions": [
+          {"state": "Draft", "action": "Approve Contract", "next_state": "Approved", "allowed": "Wholesale Manager"}
+        ]
+      }
+    ]
+  }
+}
