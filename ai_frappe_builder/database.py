@@ -1,19 +1,24 @@
 """
-database.py — Async SQLAlchemy setup plus table definitions.
+database.py — Async SQLAlchemy 2.0 setup plus comprehensive table definitions.
 
 Tables:
-  sessions   — one row per client build session
-  messages   — full conversation history (user + assistant turns)
-  app_specs  — versioned App Spec snapshots with validation results
+  sessions      — one row per client build session
+  messages      — full conversation history
+  spec_versions — versioned AppSpec snapshots with parent pointers and RFC 6902 patches
+  agent_runs    — tracking runs per specialist agent
+  artifacts     — exported apps, test suites, generated scripts
+  qa_runs       — bench and unit test execution runs
 """
 
-import uuid
-from datetime import datetime, timezone
+from __future__ import annotations
 
+from datetime import UTC, datetime
+from typing import Any
+import uuid
 from sqlalchemy import (
     Boolean,
-    Column,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -23,17 +28,14 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from ai_frappe_builder.config import get_settings
 
-from config import settings
-
-# ---------------------------------------------------------------------------
-# Engine & session factory
-# ---------------------------------------------------------------------------
+settings = get_settings()
 
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=False,          # set True to log SQL
+    echo=False,
     future=True,
 )
 
@@ -42,11 +44,6 @@ AsyncSessionLocal = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
 )
-
-
-# ---------------------------------------------------------------------------
-# ORM Models
-# ---------------------------------------------------------------------------
 
 
 class Base(DeclarativeBase):
@@ -58,18 +55,18 @@ class Session(Base):
 
     __tablename__ = "sessions"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    client_name = Column(String, nullable=False)
-    status = Column(
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    client_name: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(
         String,
         nullable=False,
         default="discovery",
-        # valid values: discovery | planned | applying | done | failed
+        # discovery | drafting | validating | healing | scripting | reporting | exporting | testing | done | failed
     )
-    frappe_url = Column(String, nullable=True)
-    frappe_api_key = Column(String, nullable=True)
-    frappe_api_secret = Column(String, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    frappe_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    frappe_api_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    frappe_api_secret: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
 
 class Message(Base):
@@ -77,38 +74,87 @@ class Message(Base):
 
     __tablename__ = "messages"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    session_id = Column(String, ForeignKey("sessions.id"), nullable=False, index=True)
-    role = Column(String, nullable=False)   # "user" | "assistant" | "system"
-    content = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    session_id: Mapped[str] = mapped_column(String, ForeignKey("sessions.id"), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String, nullable=False)  # user | assistant | system
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
 
-class AppSpec(Base):
-    """Versioned snapshot of the App Spec JSON returned by the planner."""
+class SpecVersion(Base):
+    """Versioned snapshot of the AppSpec with parent pointer and RFC 6902 patch."""
 
-    __tablename__ = "app_specs"
+    __tablename__ = "spec_versions"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    session_id = Column(String, ForeignKey("sessions.id"), nullable=False, index=True)
-    version = Column(Integer, nullable=False, default=1)
-    spec_json = Column(Text, nullable=False)          # JSON string
-    validation_result = Column(Text, nullable=True)   # JSON string
-    is_current = Column(Boolean, nullable=False, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    session_id: Mapped[str] = mapped_column(String, ForeignKey("sessions.id"), nullable=False, index=True)
+    parent_version_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    spec_json: Mapped[str] = mapped_column(Text, nullable=False)
+    patch_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    validation_result: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_current: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
-    __table_args__ = (
-        UniqueConstraint("session_id", "version", name="uq_session_version"),
-    )
+    __table_args__ = (UniqueConstraint("session_id", "version", name="uq_session_spec_version"),)
+
+
+# Legacy alias for backward compatibility
+AppSpec = SpecVersion
+
+
+class AgentRun(Base):
+    """Track execution of each specialist agent."""
+
+    __tablename__ = "agent_runs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    session_id: Mapped[str] = mapped_column(String, ForeignKey("sessions.id"), nullable=False, index=True)
+    agent_name: Mapped[str] = mapped_column(String, nullable=False)
+    state: Mapped[str] = mapped_column(String, nullable=False)
+    input_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    output_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    latency_ms: Mapped[float] = mapped_column(Float, default=0.0)
+    status: Mapped[str] = mapped_column(String, default="success")  # success | failed
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+
+
+class Artifact(Base):
+    """Exported bundles, generated files, diagrams, and logs."""
+
+    __tablename__ = "artifacts"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    session_id: Mapped[str] = mapped_column(String, ForeignKey("sessions.id"), nullable=False, index=True)
+    artifact_type: Mapped[str] = mapped_column(String, nullable=False)  # zip | repo | report | diagram
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    file_path: Mapped[str] = mapped_column(String, nullable=False)
+    meta_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+
+
+class QARun(Base):
+    """Bench and unit test execution results."""
+
+    __tablename__ = "qa_runs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    session_id: Mapped[str] = mapped_column(String, ForeignKey("sessions.id"), nullable=False, index=True)
+    test_suite: Mapped[str] = mapped_column(String, nullable=False)
+    passed: Mapped[bool] = mapped_column(Boolean, default=False)
+    total_tests: Mapped[int] = mapped_column(Integer, default=0)
+    failed_tests: Mapped[int] = mapped_column(Integer, default=0)
+    traceback: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Database Initialization & Dependency
 # ---------------------------------------------------------------------------
 
 
 async def init_db() -> None:
-    """Create all tables if they don't exist yet (called at startup)."""
+    """Create all tables if they don't exist yet."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -120,7 +166,7 @@ async def get_db() -> AsyncSession:
 
 
 # ---------------------------------------------------------------------------
-# Convenience CRUD helpers used by planner / routers
+# Convenience CRUD Helpers
 # ---------------------------------------------------------------------------
 
 
@@ -151,7 +197,10 @@ async def get_session(db: AsyncSession, session_id: str) -> Session | None:
 
 
 async def add_message(
-    db: AsyncSession, session_id: str, role: str, content: str
+    db: AsyncSession,
+    session_id: str,
+    role: str,
+    content: str,
 ) -> Message:
     msg = Message(
         id=str(uuid.uuid4()),
@@ -167,9 +216,7 @@ async def add_message(
 
 async def get_messages(db: AsyncSession, session_id: str) -> list[Message]:
     result = await db.execute(
-        select(Message)
-        .where(Message.session_id == session_id)
-        .order_by(Message.created_at)
+        select(Message).where(Message.session_id == session_id).order_by(Message.created_at)
     )
     return list(result.scalars().all())
 
@@ -179,30 +226,30 @@ async def save_app_spec(
     session_id: str,
     spec_json: str,
     validation_result: str | None = None,
-) -> AppSpec:
-    """Save a new App Spec version, marking previous ones as not-current."""
-    # Fetch latest version number
+    parent_version_id: str | None = None,
+    patch_json: str | None = None,
+) -> SpecVersion:
+    """Save a new SpecVersion, marking previous ones as not-current."""
     result = await db.execute(
-        select(AppSpec.version)
-        .where(AppSpec.session_id == session_id)
-        .order_by(AppSpec.version.desc())
+        select(SpecVersion.version)
+        .where(SpecVersion.session_id == session_id)
+        .order_by(SpecVersion.version.desc())
         .limit(1)
     )
     latest = result.scalar_one_or_none()
     next_version = (latest or 0) + 1
 
-    # Mark all previous as not current
     await db.execute(
-        update(AppSpec)
-        .where(AppSpec.session_id == session_id)
-        .values(is_current=False)
+        update(SpecVersion).where(SpecVersion.session_id == session_id).values(is_current=False)
     )
 
-    spec = AppSpec(
+    spec = SpecVersion(
         id=str(uuid.uuid4()),
         session_id=session_id,
+        parent_version_id=parent_version_id,
         version=next_version,
         spec_json=spec_json,
+        patch_json=patch_json,
         validation_result=validation_result,
         is_current=True,
     )
@@ -212,20 +259,16 @@ async def save_app_spec(
     return spec
 
 
-async def get_current_spec(db: AsyncSession, session_id: str) -> AppSpec | None:
+async def get_current_spec(db: AsyncSession, session_id: str) -> SpecVersion | None:
     result = await db.execute(
-        select(AppSpec)
-        .where(AppSpec.session_id == session_id, AppSpec.is_current == True)  # noqa: E712
-        .order_by(AppSpec.version.desc())
+        select(SpecVersion)
+        .where(SpecVersion.session_id == session_id, SpecVersion.is_current == True)  # noqa: E712
+        .order_by(SpecVersion.version.desc())
         .limit(1)
     )
     return result.scalar_one_or_none()
 
 
-async def update_session_status(
-    db: AsyncSession, session_id: str, status: str
-) -> None:
-    await db.execute(
-        update(Session).where(Session.id == session_id).values(status=status)
-    )
+async def update_session_status(db: AsyncSession, session_id: str, status: str) -> None:
+    await db.execute(update(Session).where(Session.id == session_id).values(status=status))
     await db.commit()

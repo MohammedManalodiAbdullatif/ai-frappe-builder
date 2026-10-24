@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     # --- LLM Provider (Ollama Cloud / OpenAI compatible) ---
     LLM_BASE_URL: str = "https://ollama.com/v1"
-    LLM_API_KEY: str = "9e2a356ae3e548eda6254d3fadd06852.VcurFZ3OaoRDR7ValomgbB5-"
+    LLM_API_KEY: str = ""
     LLM_MODEL: str = "gemma4:31b"
 
     # Backward compatibility aliases

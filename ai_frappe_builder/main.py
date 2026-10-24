@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import init_db, get_db, create_session, add_message, get_messages, get_current_spec
 from database import get_session as db_get_session
-from routers import chat, plan, apply, export
+from routers import apply, chat, events, export, plan
 import planner
 import validator
 import applier
@@ -77,11 +77,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routers
+# Routers (Legacy and versioned /api/v1)
 app.include_router(chat.router, prefix="/chat", tags=["Chat"])
 app.include_router(plan.router, prefix="/plan", tags=["Plan"])
 app.include_router(apply.router, prefix="/apply", tags=["Apply"])
 app.include_router(export.router, prefix="/export", tags=["Export"])
+
+app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat v1"])
+app.include_router(plan.router, prefix="/api/v1/plan", tags=["Plan v1"])
+app.include_router(apply.router, prefix="/api/v1/apply", tags=["Apply v1"])
+app.include_router(export.router, prefix="/api/v1/export", tags=["Export v1"])
+app.include_router(events.router)
 
 
 # ---------------------------------------------------------------------------
