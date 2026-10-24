@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { BuildResponse, FrappeConfig } from './types';
+import { BuildResponse, FileNode, FrappeConfig } from './types';
 
 const API_BASE = 'http://localhost:8000';
 
@@ -10,7 +10,7 @@ export const api = {
   },
 
   async startChat(message: string, clientName: string = 'Frappe Client'): Promise<any> {
-    const res = await axios.post(`${API_BASE}/chat/start`, {
+    const res = await axios.post(`${API_BASE}/api/v1/chat/start`, {
       client_name: clientName,
       message,
     });
@@ -18,7 +18,7 @@ export const api = {
   },
 
   async sendMessage(sessionId: string, message: string): Promise<any> {
-    const res = await axios.post(`${API_BASE}/chat/message`, {
+    const res = await axios.post(`${API_BASE}/api/v1/chat/message`, {
       session_id: sessionId,
       message,
     });
@@ -37,14 +37,26 @@ export const api = {
   },
 
   async getPlan(sessionId: string): Promise<any> {
-    const res = await axios.get(`${API_BASE}/plan/${sessionId}`);
+    const res = await axios.get(`${API_BASE}/api/v1/plan/${sessionId}`);
     return res.data;
   },
 
   async exportApp(sessionId: string, gitRemote?: string): Promise<any> {
-    const res = await axios.post(`${API_BASE}/export/${sessionId}`, {
+    const res = await axios.post(`${API_BASE}/api/v1/export/${sessionId}`, {
       output_dir: '/tmp/frappe_exports',
       git_remote: gitRemote || null,
+    });
+    return res.data;
+  },
+
+  async getExportTree(sessionId: string): Promise<FileNode> {
+    const res = await axios.get(`${API_BASE}/api/v1/export/${sessionId}/tree`);
+    return res.data;
+  },
+
+  async getExportFile(sessionId: string, filePath: string): Promise<{ path: string; content: string }> {
+    const res = await axios.get(`${API_BASE}/api/v1/export/${sessionId}/file`, {
+      params: { path: filePath },
     });
     return res.data;
   },
@@ -57,5 +69,43 @@ export const api = {
   async getSessionDetail(sessionId: string): Promise<any> {
     const res = await axios.get(`${API_BASE}/sessions/${sessionId}`);
     return res.data;
+  },
+
+  connectEvents(sessionId: string, onEvent: (eventType: string, data: any) => void): EventSource {
+    const es = new EventSource(`${API_BASE}/api/v1/sessions/${sessionId}/events`);
+    es.onmessage = (e) => {
+      try {
+        const payload = JSON.parse(e.data);
+        onEvent('message', payload);
+      } catch (err) {
+        console.error('Failed to parse SSE event data', err);
+      }
+    };
+    es.addEventListener('token', (e: any) => {
+      try {
+        onEvent('token', JSON.parse(e.data));
+      } catch {}
+    });
+    es.addEventListener('question', (e: any) => {
+      try {
+        onEvent('question', JSON.parse(e.data));
+      } catch {}
+    });
+    es.addEventListener('state_change', (e: any) => {
+      try {
+        onEvent('state_change', JSON.parse(e.data));
+      } catch {}
+    });
+    es.addEventListener('validation', (e: any) => {
+      try {
+        onEvent('validation', JSON.parse(e.data));
+      } catch {}
+    });
+    es.addEventListener('spec_patch', (e: any) => {
+      try {
+        onEvent('spec_patch', JSON.parse(e.data));
+      } catch {}
+    });
+    return es;
   },
 };
