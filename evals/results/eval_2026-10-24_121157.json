@@ -1,0 +1,59 @@
+{
+  "benchmark_timestamp": "2026-10-24T12:11:57.444046+00:00",
+  "total_archetypes": 5,
+  "spec_validity_rate_pct": 100.0,
+  "bench_pass_rate_pct": 100.0,
+  "total_duration_sec": 0.55,
+  "results": [
+    {
+      "archetype": "b2b_wholesale",
+      "valid": true,
+      "errors": [],
+      "warnings": [],
+      "bench_passed": true,
+      "bench_mode": "local_verification",
+      "total_bench_tests": 24,
+      "duration_sec": 0.01
+    },
+    {
+      "archetype": "car_rental",
+      "valid": true,
+      "errors": [],
+      "warnings": [],
+      "bench_passed": true,
+      "bench_mode": "local_verification",
+      "total_bench_tests": 32,
+      "duration_sec": 0.01
+    },
+    {
+      "archetype": "field_service",
+      "valid": true,
+      "errors": [],
+      "warnings": [],
+      "bench_passed": true,
+      "bench_mode": "local_verification",
+      "total_bench_tests": 24,
+      "duration_sec": 0.0
+    },
+    {
+      "archetype": "medical_clinic",
+      "valid": true,
+      "errors": [],
+      "warnings": [],
+      "bench_passed": true,
+      "bench_mode": "local_verification",
+      "total_bench_tests": 24,
+      "duration_sec": 0.01
+    },
+    {
+      "archetype": "school_academy",
+      "valid": true,
+      "errors": [],
+      "warnings": [],
+      "bench_passed": true,
+      "bench_mode": "local_verification",
+      "total_bench_tests": 24,
+      "duration_sec": 0.01
+    }
+  ]
+}

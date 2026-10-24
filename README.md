@@ -1,79 +1,130 @@
-# AI Frappe App Builder
+# AI Frappe App Builder (v2.0)
 
-An end-to-end AI-powered system that turns client business requirements into installable Frappe/ERPNext applications with real DocTypes, Workflows, Server/Client Scripts, Reports, Dashboards, and Live Desk Previews.
+A multi-agent AI implementation system that converts natural-language business specifications into installable, verifiable Frappe v15 and ERPNext applications.
 
----
-
-## Architecture Overview
-
-```
-Client Description / Chat
-         ↓
-FastAPI AI Frappe Engine (ai_frappe_builder/)
-  ├── planner.py            ← LLM reasoning, schema design & discovery questions
-  ├── validator.py          ← 12 deterministic validation rules
-  ├── script_generator.py   ← Generates Frappe server/client scripts from 7 battle-tested snippet patterns
-  ├── report_builder.py     ← Builds Reports, Number Cards & Dashboards
-  ├── frappe_client.py      ← Async Frappe REST API client (Token Auth)
-  ├── applier.py            ← Materializes DocTypes, Workflows, Scripts, Reports & sample data
-  ├── run_tests.py          ← Automated verification tests on created DocTypes
-  └── exporter.py           ← Exports standalone installable Frappe app to disk & git
-         ↓
-Frappe / ERPNext Remote Server (Live Desk forms rendered in iframe)
-         ↓
-Modern Web UI (frontend/)
-  ├── Chat Pane with interactive discovery questions
-  ├── Real-time Frappe desk form preview
-  ├── App Spec JSON inspector
-  ├── Live build checklist
-  └── One-click export to Git repo
-```
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
+![Frappe Target](https://img.shields.io/badge/frappe-v15.0-orange.svg)
+![Tests](https://img.shields.io/badge/tests-31%20passed-brightgreen.svg)
+![Mypy](https://img.shields.io/badge/mypy-strict%20clean-green.svg)
+![Ruff](https://img.shields.io/badge/ruff-clean-green.svg)
 
 ---
 
-## Quick Start
+## 1. Key Features
 
-### 1. Configure Backend Environment
+- **10 Specialist Agents Orchestration**: `Interviewer`, `Architect`, `Differ`, `Validator`, `Healer`, `ScriptWriter`, `ReportBuilder`, `Exporter`, `QA`, and `Documenter`.
+- **AppSpec 2.0 Single Source of Truth**: Full schema definition with RFC 6902 JSON Patching (`SpecPatch`) eliminating whole-spec regeneration hallucination drift.
+- **Deterministic Validator**: Zero-LLM verification of 20+ Frappe v15 schema rules (reserved names, referential links, child table constraints, workflow transitions, circular link detection).
+- **Canonical `bench new-app` Exporter**: Generates byte-stable DocType JSON, `fixtures/`, `install.py`, `hooks.py`, standalone Git repository, and downloadable `.zip` bundles.
+- **Containerized Bench & Local Testing**: Docker-compose Frappe v15 bench verification with automatic in-process AST and schema verification fallback.
+- **Three-Panel Redesigned UI**: Real-time Server-Sent Events (SSE), Interactive ERD Data Model, Client-Side Desk Form Simulator, Workflows viewer, File Tree/Code viewer, and Audit Inspector.
+- **Automated Evaluation Harness**: Benchmark runner with dated JSON reports evaluating validity rates, bench pass rates, and costs.
+
+---
+
+## 2. Architecture Overview
+
+```
+                      +------------------------------------+
+                      |     Three-Panel React 18 UI        |
+                      |     (ERD, Simulator, Tree, SSE)    |
+                      +-----------------+------------------+
+                                        │ REST & SSE Stream
+                                        ▼
+                      +------------------------------------+
+                      |        FastAPI Orchestrator        |
+                      |   State Machine Lifecycle Engine   |
+                      +-----------------+------------------+
+                                        │ Dispatches tasks
+          +-----------------------------+-----------------------------+
+          │                             │                             │
+          ▼                             ▼                             ▼
+   [Interviewer]                  [Architect]                     [Differ]
+One-by-one discovery         AppSpec 2.0 Synthesis         RFC 6902 JSON Patches
+          │                             │                             │
+          ▼                             ▼                             ▼
+    [Validator]                      [Healer]                   [ScriptWriter]
+Deterministic Rules            Targeted Repairs          Controllers & Client Scripts
+          │                             │                             │
+          ▼                             ▼                             ▼
+  [ReportBuilder]                  [Exporter]                       [QA]
+Workspaces & Charts         bench new-app canonical pkg       Bench & Unit Tests
+                                        │
+                                        ▼
+                          +----------------------------+
+                          |   Downloadable .zip bundle |
+                          |   Standalone Git Repo      |
+                          +----------------------------+
+```
+
+---
+
+## 3. Quickstart
+
+### Prerequisites
+- Python 3.11+
+- Node.js 18+
+
+### Setup & Launch
 ```bash
-cd ai_frappe_builder
+# 1. Clone repository
+git clone https://github.com/your-org/ai-frappe-builder.git
+cd ai-frappe-builder
+
+# 2. Setup backend
+pip install -e ".[dev]"
 cp .env.example .env
-```
-Edit `.env` and fill in:
-```env
-OPENROUTER_API_KEY=sk-or-v1-your-key-here
-OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
-FRAPPE_URL=https://your-site.frappe.cloud
-FRAPPE_API_KEY=your_frappe_api_key
-FRAPPE_API_SECRET=your_frappe_api_secret
-DATABASE_URL=sqlite+aiosqlite:///./ai_frappe.db
-```
 
-### 2. Start Backend Service
-```bash
-cd ai_frappe_builder
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-Interactive API documentation: `http://localhost:8000/docs`
-
-### 3. Start Frontend UI
-```bash
+# 3. Setup frontend
 cd frontend
-npm run dev
+npm install
+npm run build
+cd ..
+
+# 4. Start services
+# Terminal 1: Backend
+uvicorn ai_frappe_builder.main:app --host 0.0.0.0 --port 8000
+
+# Terminal 2: Frontend
+cd frontend && npm run dev -- --host 0.0.0.0 --port 3000
 ```
-Open `http://localhost:3000` in your browser.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## API Endpoints
+## 4. Testing & Verification
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/health` | Health check |
-| `POST` | `/build` | **One-shot endpoint**: Describe → Plan → Validate → Apply → Preview URLs |
-| `POST` | `/chat/start` | Start discovery chat session |
-| `POST` | `/chat/message` | Send answer / follow-up instructions |
-| `GET` | `/plan/{session_id}` | Retrieve generated App Spec JSON and validation result |
-| `POST` | `/apply/{session_id}` | Re-trigger apply for failed/partial sessions |
-| `POST` | `/export/{session_id}` | Export app as real Frappe repository with git commit |
-| `GET` | `/sessions` | List all build sessions |
-| `GET` | `/sessions/{session_id}` | Get session details & chat history |
+```bash
+# Run all test suites (unit, contract, golden)
+make test
+
+# Run unit tests (Hypothesis fuzzing, validator rules)
+make test-unit
+
+# Run contract tests (mocked agent I/O contracts)
+make test-contract
+
+# Run golden archetype exports (Car Rental, Wholesale, Clinic, School, Field Service)
+make test-golden
+
+# Run full evaluation benchmark
+make eval
+
+# Run frontend test suite
+cd frontend && npm test
+```
+
+---
+
+## 5. Documentation Suite
+
+- [Architecture & State Machine Design](docs/ARCHITECTURE.md)
+- [Specialist Agents Catalog](docs/AGENTS.md)
+- [AppSpec 2.0 Contract & RFC 6902 Patching](docs/SPEC.md)
+- [Frappe v15 Deterministic Schema Rules](docs/FRAPPE_RULES.md)
+- [Multi-Layer Testing Strategy](docs/TESTING.md)
+- [LLM Evaluation Benchmark Harness](docs/EVALS.md)
+- [Project Backlog](docs/BACKLOG.md)
+- [Contributing Guide](CONTRIBUTING.md)
+- [Security Policy](SECURITY.md)
+- [Changelog](CHANGELOG.md)
