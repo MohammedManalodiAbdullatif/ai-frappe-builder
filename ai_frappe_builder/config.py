@@ -3,7 +3,11 @@ config.py — Application settings loaded from environment / .env file.
 Uses pydantic-settings for type-safe, validated configuration.
 """
 
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_BASE_DIR = Path(__file__).resolve().parent
+_ROOT_DIR = _BASE_DIR.parent
 
 
 class Settings(BaseSettings):
@@ -31,7 +35,11 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./ai_frappe.db"
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(
+            str(_ROOT_DIR / ".env"),
+            str(_BASE_DIR / ".env"),
+            ".env",
+        ),
         env_file_encoding="utf-8",
         extra="ignore",
     )
