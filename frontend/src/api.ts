@@ -3,14 +3,19 @@ import { BuildResponse, FileNode, FrappeConfig } from './types';
 
 const API_BASE = 'http://localhost:8000';
 
+const client = axios.create({
+  baseURL: API_BASE,
+  timeout: 180000, // 3 minutes timeout for LLM synthesis and healing
+});
+
 export const api = {
   async health(): Promise<{ status: string }> {
-    const res = await axios.get(`${API_BASE}/health`);
+    const res = await client.get('/health');
     return res.data;
   },
 
   async startChat(message: string, clientName: string = 'Frappe Client'): Promise<any> {
-    const res = await axios.post(`${API_BASE}/api/v1/chat/start`, {
+    const res = await client.post('/api/v1/chat/start', {
       client_name: clientName,
       message,
     });
@@ -18,7 +23,7 @@ export const api = {
   },
 
   async sendMessage(sessionId: string, message: string): Promise<any> {
-    const res = await axios.post(`${API_BASE}/api/v1/chat/message`, {
+    const res = await client.post('/api/v1/chat/message', {
       session_id: sessionId,
       message,
     });
@@ -26,7 +31,7 @@ export const api = {
   },
 
   async oneShotBuild(config: FrappeConfig, description: string): Promise<BuildResponse> {
-    const res = await axios.post(`${API_BASE}/build`, {
+    const res = await client.post('/build', {
       client_name: config.clientName,
       description,
       frappe_url: config.frappeUrl,
@@ -37,12 +42,12 @@ export const api = {
   },
 
   async getPlan(sessionId: string): Promise<any> {
-    const res = await axios.get(`${API_BASE}/api/v1/plan/${sessionId}`);
+    const res = await client.get(`/api/v1/plan/${sessionId}`);
     return res.data;
   },
 
   async exportApp(sessionId: string, gitRemote?: string): Promise<any> {
-    const res = await axios.post(`${API_BASE}/api/v1/export/${sessionId}`, {
+    const res = await client.post(`/api/v1/export/${sessionId}`, {
       output_dir: '/tmp/frappe_exports',
       git_remote: gitRemote || null,
     });
@@ -50,12 +55,12 @@ export const api = {
   },
 
   async getExportTree(sessionId: string): Promise<FileNode> {
-    const res = await axios.get(`${API_BASE}/api/v1/export/${sessionId}/tree`);
+    const res = await client.get(`/api/v1/export/${sessionId}/tree`);
     return res.data;
   },
 
   async getExportFile(sessionId: string, filePath: string): Promise<{ path: string; content: string }> {
-    const res = await axios.get(`${API_BASE}/api/v1/export/${sessionId}/file`, {
+    const res = await client.get(`/api/v1/export/${sessionId}/file`, {
       params: { path: filePath },
     });
     return res.data;

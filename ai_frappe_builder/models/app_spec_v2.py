@@ -237,24 +237,28 @@ class WorkflowSpec(BaseModel):
 class ServerScriptSpec(BaseModel):
     """Specification for a Frappe Server Script / Controller Hook."""
 
-    name: str
+    name: str = "custom_server_script"
     script_type: str = "DocType Event"
-    reference_doctype: str
+    reference_doctype: str = Field("", alias="doctype")
     doctype_event: str = "Before Save"
     purpose: str = "Custom logic"
     pattern: str = "custom"
     script: str | None = None
 
+    model_config = {"populate_by_name": True, "extra": "ignore"}
+
 
 class ClientScriptSpec(BaseModel):
     """Specification for a Frappe Desk Client Script (JavaScript)."""
 
-    name: str
-    reference_doctype: str
+    name: str = "custom_client_script"
+    reference_doctype: str = Field("", alias="doctype")
     view: str = "Form"
     purpose: str = "UI enhancement"
     pattern: str = "custom"
     script: str | None = None
+
+    model_config = {"populate_by_name": True, "extra": "ignore"}
 
 
 # ---------------------------------------------------------------------------
@@ -265,13 +269,15 @@ class ClientScriptSpec(BaseModel):
 class ReportSpec(BaseModel):
     """Specification for a Frappe Script or Query Report."""
 
-    name: str
-    ref_doctype: str
+    name: str = "custom_report"
+    ref_doctype: str = Field("", alias="reference_doctype")
     report_type: str = "Script Report"
     columns: list[dict[str, Any]] = Field(default_factory=list)
     filters: list[dict[str, Any]] = Field(default_factory=list)
     script: str | None = None
     query: str | None = None
+
+    model_config = {"populate_by_name": True, "extra": "ignore"}
 
 
 class NumberCardSpec(BaseModel):

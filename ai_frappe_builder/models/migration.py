@@ -229,10 +229,73 @@ def migrate_v1_to_v2(raw: dict[str, Any]) -> AppSpecV2:
                 )
             )
 
-        # Migrate Scripts and Reports
-        server_scripts = [ServerScriptSpec(**s) for s in raw_app.get("server_scripts", [])]
-        client_scripts = [ClientScriptSpec(**s) for s in raw_app.get("client_scripts", [])]
-        reports = [ReportSpec(**r) for r in raw_app.get("reports", [])]
+        default_ref_dt = doctypes[0].name if doctypes else "DocType"
+
+        # Migrate Scripts and Reports with resilient field normalization
+        server_scripts: list[ServerScriptSpec] = []
+        for s in raw_app.get("server_scripts", []):
+            if isinstance(s, dict):
+                ref_dt = (
+                    s.get("reference_doctype")
+                    or s.get("doctype")
+                    or s.get("document_type")
+                    or s.get("ref_doctype")
+                    or default_ref_dt
+                )
+                server_scripts.append(
+                    ServerScriptSpec(
+                        name=s.get("name", "custom_server_script"),
+                        script_type=s.get("script_type", "DocType Event"),
+                        reference_doctype=ref_dt,
+                        doctype_event=s.get("doctype_event", "Before Save"),
+                        purpose=s.get("purpose", "Custom logic"),
+                        pattern=s.get("pattern", "custom"),
+                        script=s.get("script"),
+                    )
+                )
+
+        client_scripts: list[ClientScriptSpec] = []
+        for s in raw_app.get("client_scripts", []):
+            if isinstance(s, dict):
+                ref_dt = (
+                    s.get("reference_doctype")
+                    or s.get("doctype")
+                    or s.get("document_type")
+                    or s.get("ref_doctype")
+                    or default_ref_dt
+                )
+                client_scripts.append(
+                    ClientScriptSpec(
+                        name=s.get("name", "custom_client_script"),
+                        reference_doctype=ref_dt,
+                        view=s.get("view", "Form"),
+                        purpose=s.get("purpose", "UI enhancement"),
+                        pattern=s.get("pattern", "custom"),
+                        script=s.get("script"),
+                    )
+                )
+
+        reports: list[ReportSpec] = []
+        for r in raw_app.get("reports", []):
+            if isinstance(r, dict):
+                ref_dt = (
+                    r.get("ref_doctype")
+                    or r.get("reference_doctype")
+                    or r.get("doctype")
+                    or r.get("document_type")
+                    or default_ref_dt
+                )
+                reports.append(
+                    ReportSpec(
+                        name=r.get("name", "Custom Report"),
+                        ref_doctype=ref_dt,
+                        report_type=r.get("report_type", "Script Report"),
+                        columns=r.get("columns", []),
+                        filters=r.get("filters", []),
+                        script=r.get("script"),
+                        query=r.get("query"),
+                    )
+                )
 
         app_meta = AppMetadata(
             app_name=app_name,

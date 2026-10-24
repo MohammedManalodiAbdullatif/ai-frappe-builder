@@ -190,9 +190,19 @@ async def chat_start(
 
     apply_result: dict | None = None
     if spec.status == "ready":
-        apply_result = await _auto_validate_and_apply(
-            spec, sess.id, db, _make_frappe_client(sess)
-        )
+        try:
+            apply_result = await _auto_validate_and_apply(
+                spec, sess.id, db, _make_frappe_client(sess)
+            )
+        except Exception as exc:
+            logger.error("Auto validate and apply error: %s", exc, exc_info=True)
+            apply_result = {
+                "apply_status": "validation_failed",
+                "validation_errors": [f"Validation error: {exc}"],
+                "created": [],
+                "errors": [str(exc)],
+                "preview_urls": [],
+            }
 
     return ChatResponse(
         session_id=sess.id,
@@ -251,9 +261,19 @@ async def chat_message(
 
     apply_result: dict | None = None
     if spec.status == "ready":
-        apply_result = await _auto_validate_and_apply(
-            spec, sess.id, db, _make_frappe_client(sess)
-        )
+        try:
+            apply_result = await _auto_validate_and_apply(
+                spec, sess.id, db, _make_frappe_client(sess)
+            )
+        except Exception as exc:
+            logger.error("Auto validate and apply error: %s", exc, exc_info=True)
+            apply_result = {
+                "apply_status": "validation_failed",
+                "validation_errors": [f"Validation error: {exc}"],
+                "created": [],
+                "errors": [str(exc)],
+                "preview_urls": [],
+            }
 
     return ChatResponse(
         session_id=sess.id,
