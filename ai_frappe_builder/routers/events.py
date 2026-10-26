@@ -6,8 +6,10 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator
+
 from fastapi import APIRouter, Request
 from sse_starlette.sse import EventSourceResponse
+
 from ai_frappe_builder.events import event_manager
 
 logger = logging.getLogger(__name__)

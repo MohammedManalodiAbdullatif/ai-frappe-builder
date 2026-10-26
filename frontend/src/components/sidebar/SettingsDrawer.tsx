@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
-import { X, Sliders, Radio, Cpu, Layers } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, Sliders, Radio, Cpu, Layers, Server, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { AppSettings } from '../../state/useSession';
+import { api } from '../../api';
 
 interface SettingsDrawerProps {
   isOpen: boolean;
@@ -17,6 +18,9 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
   onUpdateSettings,
   sseConnected,
 }) => {
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionResult, setConnectionResult] = useState<any>(null);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
@@ -26,6 +30,23 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  const handleTestConnection = async () => {
+    setTestingConnection(true);
+    setConnectionResult(null);
+    try {
+      const res = await api.testFrappeConnection(
+        settings.frappeUrl || 'http://crm.localhost:8015',
+        settings.frappeApiKey || '992f21dbfdb7f47',
+        settings.frappeApiSecret || 'acf9538d97bf2a6'
+      );
+      setConnectionResult(res);
+    } catch (err: any) {
+      setConnectionResult({ ok: false, error: err.message });
+    } finally {
+      setTestingConnection(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -104,6 +125,81 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
               onChange={(e) => onUpdateSettings({ erpnextRequired: e.target.checked })}
               className="w-4 h-4 accent-[var(--accent)] rounded cursor-pointer"
             />
+          </div>
+
+          {/* Live Frappe Site Integration */}
+          <div className="flex flex-col gap-2 pt-2 border-t border-[var(--border)]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 font-medium text-xs text-[var(--text)]">
+                <Server className="w-3.5 h-3.5 text-[var(--accent)]" />
+                <span>Live Frappe Bench Site</span>
+              </div>
+              <button
+                onClick={handleTestConnection}
+                disabled={testingConnection}
+                className="px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--border)] text-[var(--text)] hover:bg-[var(--accent)] hover:text-white transition-colors flex items-center gap-1 disabled:opacity-50"
+              >
+                {testingConnection ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Connecting...</span>
+                  </>
+                ) : (
+                  <span>Test Connection</span>
+                )}
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <input
+                type="text"
+                placeholder="Frappe Site URL (e.g. http://crm.localhost:8015)"
+                value={settings.frappeUrl || ''}
+                onChange={(e) => onUpdateSettings({ frappeUrl: e.target.value })}
+                className="w-full px-2.5 py-1.5 rounded-card border border-[var(--border)] bg-[var(--bg)] text-xs text-[var(--text)] font-mono outline-none"
+              />
+              <div className="grid grid-cols-2 gap-1.5">
+                <input
+                  type="password"
+                  placeholder="API Key"
+                  value={settings.frappeApiKey || ''}
+                  onChange={(e) => onUpdateSettings({ frappeApiKey: e.target.value })}
+                  className="w-full px-2.5 py-1.5 rounded-card border border-[var(--border)] bg-[var(--bg)] text-xs text-[var(--text)] font-mono outline-none"
+                />
+                <input
+                  type="password"
+                  placeholder="API Secret"
+                  value={settings.frappeApiSecret || ''}
+                  onChange={(e) => onUpdateSettings({ frappeApiSecret: e.target.value })}
+                  className="w-full px-2.5 py-1.5 rounded-card border border-[var(--border)] bg-[var(--bg)] text-xs text-[var(--text)] font-mono outline-none"
+                />
+              </div>
+            </div>
+
+            {connectionResult && (
+              <div
+                className={`p-2 rounded-card text-[11px] flex items-center gap-1.5 ${
+                  connectionResult.ok
+                    ? 'bg-[var(--ok)]/10 text-[var(--ok)]'
+                    : 'bg-[var(--err)]/10 text-[var(--err)]'
+                }`}
+              >
+                {connectionResult.ok ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>
+                      Live site connected! ({connectionResult.installed_apps.length} apps,{' '}
+                      {connectionResult.doctypes_count} DocTypes)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="truncate">{connectionResult.error}</span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {/* SSE Stream Status */}

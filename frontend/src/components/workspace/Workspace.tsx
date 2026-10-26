@@ -7,7 +7,7 @@ import { WorkflowsPanel } from './panels/WorkflowsPanel';
 import { FilesPanel } from './panels/FilesPanel';
 import { SpecPanel } from './panels/SpecPanel';
 import { AppMetadata, ValidationReport, PipelineStage } from '../../types';
-import { X } from 'lucide-react';
+import { X, Maximize2, Minimize2 } from 'lucide-react';
 
 interface WorkspaceProps {
   isOpen: boolean;
@@ -17,6 +17,11 @@ interface WorkspaceProps {
   sessionId: string | null;
   stage: PipelineStage;
   validation: ValidationReport | null;
+  qaReport?: any;
+  onUpdateApp?: (app: AppMetadata) => void;
+  onApplyToFrappe?: () => void;
+  isApplying?: boolean;
+  applyResult?: any;
 }
 
 export const Workspace: React.FC<WorkspaceProps> = ({
@@ -27,8 +32,14 @@ export const Workspace: React.FC<WorkspaceProps> = ({
   sessionId,
   stage,
   validation,
+  qaReport,
+  onUpdateApp,
+  onApplyToFrappe,
+  isApplying,
+  applyResult,
 }) => {
   const [activeTab, setActiveTab] = useState<WorkspaceTabId>('erd');
+  const [isMaximized, setIsMaximized] = useState(false);
 
   if (!isOpen) return null;
 
@@ -42,25 +53,43 @@ export const Workspace: React.FC<WorkspaceProps> = ({
 
       {/* Workspace Panel */}
       <aside
-        className={`fixed lg:static inset-y-0 right-0 z-30 w-full lg:w-[480px] flex-shrink-0 flex flex-col bg-[var(--surface)] border-l border-[var(--border)] transition-workspace overflow-hidden shadow-none`}
+        className={`fixed lg:static inset-y-0 right-0 z-30 flex flex-col bg-[var(--surface)] border-l border-[var(--border)] transition-all overflow-hidden shadow-none ${
+          isMaximized
+            ? 'w-full lg:w-full lg:flex-1'
+            : 'w-full lg:w-[640px] xl:w-[760px] flex-shrink-0'
+        }`}
       >
         {/* Top Header / Tabs */}
         <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)]">
           <div className="flex-1 overflow-x-auto">
             <WorkspaceTabs activeTab={activeTab} onSelectTab={setActiveTab} />
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 mr-2 rounded-card text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--border)] lg:hidden"
-            aria-label="Close workspace"
-          >
-            <X className="w-4 h-4" strokeWidth={1.5} />
-          </button>
+          <div className="flex items-center gap-1 pr-2">
+            <button
+              onClick={() => setIsMaximized(!isMaximized)}
+              className="p-1.5 rounded-card text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--border)] hidden lg:flex items-center justify-center transition-colors"
+              title={isMaximized ? 'Restore standard width' : 'Maximize canvas to full screen (n8n mode)'}
+              aria-label={isMaximized ? 'Restore workspace' : 'Maximize workspace'}
+            >
+              {isMaximized ? (
+                <Minimize2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+              ) : (
+                <Maximize2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+              )}
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-card text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--border)]"
+              aria-label="Close workspace"
+            >
+              <X className="w-4 h-4" strokeWidth={1.5} />
+            </button>
+          </div>
         </div>
 
         {/* Tab Body */}
         <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg)] overflow-hidden">
-          {activeTab === 'erd' && <ErdPanel app={app} />}
+          {activeTab === 'erd' && <ErdPanel app={app} onUpdateApp={onUpdateApp} />}
           {activeTab === 'forms' && <FormsPanel app={app} />}
           {activeTab === 'workflows' && <WorkflowsPanel app={app} />}
           {activeTab === 'files' && <FilesPanel sessionId={sessionId} />}
@@ -68,7 +97,15 @@ export const Workspace: React.FC<WorkspaceProps> = ({
         </div>
 
         {/* Bottom Status Bar */}
-        <StatusBar sessionId={sessionId} stage={stage} validation={validation} />
+        <StatusBar
+          sessionId={sessionId}
+          stage={stage}
+          validation={validation}
+          qaReport={qaReport}
+          onApplyToFrappe={onApplyToFrappe}
+          isApplying={isApplying}
+          applyResult={applyResult}
+        />
       </aside>
     </>
   );

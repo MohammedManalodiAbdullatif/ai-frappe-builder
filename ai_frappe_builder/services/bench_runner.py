@@ -192,8 +192,8 @@ class BenchRunner:
 
         return BenchExecutionResult(
             app_name=app_name,
-            passed=passed,
-            execution_mode="local_verification",
+            passed=False,
+            execution_mode="static_only",
             total_tests=tests_count,
             passed_tests=tests_count - failed_count,
             failed_tests=failed_count,

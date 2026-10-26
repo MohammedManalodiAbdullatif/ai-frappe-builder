@@ -54,9 +54,11 @@ async def test_llm_client_completion_success(mock_llm_client: LLMClient) -> None
                     "message": {
                         "content": json.dumps(
                             {
-                                "archetype": "car_rental",
-                                "ready": True,
-                                "assumptions_so_far": ["Daily pricing"],
+                                "kind": "done",
+                                "say": "All requirements captured.",
+                                "question": None,
+                                "assumptions": ["car_rental", "Daily pricing"],
+                                "coverage": {"basics": 1.0, "domain": 1.0},
                             }
                         )
                     }
@@ -71,8 +73,8 @@ async def test_llm_client_completion_success(mock_llm_client: LLMClient) -> None
         response_schema=InterviewTurn,
     )
     assert isinstance(result, dict)
-    assert result["archetype"] == "car_rental"
-    assert result["ready"] is True
+    assert result["kind"] == "done"
+    assert "car_rental" in result["assumptions"]
 
 
 @respx.mock
@@ -81,18 +83,24 @@ async def test_interviewer_agent_contract(mock_llm_client: LLMClient) -> None:
     agent = InterviewerAgent(llm_client=mock_llm_client)
 
     turn_data = {
-        "archetype": "car_rental",
-        "assumptions_so_far": ["USD currency"],
-        "ready": False,
+        "kind": "question",
+        "say": "Got it — a car rental service.",
         "question": {
             "id": "q_fleet_type",
-            "question": "What kind of vehicles do you offer?",
-            "reason": "Determines category fields",
+            "phase": "domain",
+            "text": "What kind of vehicles do you offer?",
+            "help": "Determines category fields",
+            "input": "single",
             "options": [
-                {"label": "Sedans & SUVs", "value": "passenger"},
-                {"label": "Commercial Vans", "value": "commercial"},
+                {"label": "Sedans & SUVs", "value": "passenger", "description": "Standard passenger cars"},
+                {"label": "Commercial Vans", "value": "commercial", "description": "Cargo and passenger vans"},
             ],
-            "allows_custom": True,
+            "allow_custom": True,
+        },
+        "assumptions": ["USD currency"],
+        "coverage": {
+            "basics": 0.85,
+            "domain": 0.20,
         },
     }
 
@@ -232,14 +240,25 @@ async def test_orchestrator_discovery_flow(mock_llm_client: LLMClient) -> None:
     orchestrator = Orchestrator(interviewer=interviewer)
 
     turn_data = {
-        "archetype": "car_rental",
-        "assumptions_so_far": ["Daily rate"],
-        "ready": False,
+        "kind": "question",
+        "say": "Got it — a car rental service.",
         "question": {
-            "id": "q_deposit",
-            "question": "Do you require a security deposit?",
-            "reason": "Deposit field configuration",
-            "options": [{"label": "Yes", "value": "yes"}, {"label": "No", "value": "no"}],
+            "id": "app_purpose",
+            "phase": "basics",
+            "text": "What should this app mainly help with?",
+            "help": "Guides core DocTypes",
+            "input": "single",
+            "options": [
+                {"label": "Operations & tracking", "value": "ops", "description": "Vehicle fleet management"},
+                {"label": "Customer booking", "value": "booking", "description": "Online reservations"},
+                {"label": "Reporting", "value": "reports", "description": "Fleet utilization"},
+            ],
+            "allow_custom": True,
+        },
+        "assumptions": ["Daily rate"],
+        "coverage": {
+            "basics": 0.17,
+            "domain": 0.0,
         },
     }
 
@@ -254,5 +273,5 @@ async def test_orchestrator_discovery_flow(mock_llm_client: LLMClient) -> None:
     assert res["status"] == "needs_input"
     assert res["state"] == OrchestratorState.DISCOVERY.value
     assert res["question"] is not None
-    assert res["question"]["id"] == "q_deposit"
+    assert res["question"]["id"] == "app_purpose"
     assert "Daily rate" in res["assumptions"]

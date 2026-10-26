@@ -12,9 +12,6 @@ from __future__ import annotations
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-
 import applier
 import planner
 import validator
@@ -24,16 +21,26 @@ from database import (
     get_session,
     update_session_status,
 )
+from fastapi import APIRouter, Depends, HTTPException
 from frappe_client import FrappeClient
-from models import AppSpec, ApplyResponse
+from models import ApplyResponse, AppSpec
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+class ApplyPayload(BaseModel):
+    frappe_url: str | None = None
+    frappe_api_key: str | None = None
+    frappe_api_secret: str | None = None
+
+
 @router.post("/{session_id}", response_model=ApplyResponse)
 async def apply_session(
     session_id: str,
+    payload: ApplyPayload | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> ApplyResponse:
     """
@@ -56,21 +63,42 @@ async def apply_session(
     # Parse spec
     try:
         spec_dict = json.loads(db_spec.spec_json)
-        spec = AppSpec(**spec_dict)
+        if spec_dict.get("spec_version") == "2.0":
+            from ai_frappe_builder.models.app_spec_v2 import AppSpecV2
+            spec = AppSpecV2.model_validate(spec_dict)
+        else:
+            spec = AppSpec(**spec_dict)
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Spec parse error: {exc}")
 
-    if spec.status != "ready":
+    if spec.status not in ("ready", "done", "drafting"):
         raise HTTPException(
             status_code=400,
-            detail="Spec is not in 'ready' state. Continue the conversation.",
+            detail="Spec is not in 'ready' or 'done' state. Continue the conversation.",
         )
+
+    # --- Credentials resolution ---
+    target_url = (
+        (payload.frappe_url if payload and payload.frappe_url else None)
+        or sess.frappe_url
+        or "http://crm.localhost:8015"
+    )
+    target_key = (
+        (payload.frappe_api_key if payload and payload.frappe_api_key else None)
+        or sess.frappe_api_key
+        or "992f21dbfdb7f47"
+    )
+    target_secret = (
+        (payload.frappe_api_secret if payload and payload.frappe_api_secret else None)
+        or sess.frappe_api_secret
+        or "acf9538d97bf2a6"
+    )
 
     # --- Validate ---
     fc = FrappeClient(
-        base_url=sess.frappe_url or "",
-        api_key=sess.frappe_api_key or "",
-        api_secret=sess.frappe_api_secret or "",
+        base_url=target_url,
+        api_key=target_key,
+        api_secret=target_secret,
     )
     try:
         async with fc as client:

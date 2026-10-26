@@ -7,7 +7,9 @@ and role-based operational user guides for exported Frappe applications.
 from __future__ import annotations
 
 import logging
-from pydantic import BaseModel, Field
+
+from pydantic import BaseModel
+
 from ai_frappe_builder.models.app_spec_v2 import AppSpecV2
 
 logger = logging.getLogger(__name__)

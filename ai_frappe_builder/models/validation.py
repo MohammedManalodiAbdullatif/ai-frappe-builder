@@ -13,6 +13,8 @@ class FixHint(BaseModel):
     """Actionable hint suggesting how to fix a validation error or warning."""
 
     rule: str
+    rule_id: str | None = None
+    path: str | None = None
     doctype: str | None = None
     field: str | None = None
     message: str
@@ -23,6 +25,8 @@ class ValidationErrorItem(BaseModel):
     """Detailed validation issue."""
 
     rule: str
+    rule_id: str | None = None
+    path: str | None = None
     doctype: str | None = None
     field: str | None = None
     message: str
@@ -48,16 +52,29 @@ class ValidationReport(BaseModel):
         doctype: str | None = None,
         field: str | None = None,
         fix_hint: FixHint | None = None,
+        path: str | None = None,
+        rule_id: str | None = None,
     ) -> None:
         self.is_valid = False
-        formatted = f"[{rule}] DocType '{doctype}': {message}" if doctype else f"[{rule}] {message}"
+        tag = rule_id or rule
+        formatted = f"[{tag}] DocType '{doctype}': {message}" if doctype else f"[{tag}] {message}"
         self.errors.append(formatted)
         self.detailed_errors.append(
             ValidationErrorItem(
-                rule=rule, doctype=doctype, field=field, message=message, severity="error"
+                rule=rule,
+                rule_id=rule_id or rule,
+                path=path,
+                doctype=doctype,
+                field=field,
+                message=message,
+                severity="error",
             )
         )
         if fix_hint:
+            if not fix_hint.rule_id:
+                fix_hint.rule_id = rule_id or rule
+            if not fix_hint.path:
+                fix_hint.path = path
             self.fix_hints.append(fix_hint)
 
     def add_warning(
@@ -67,13 +84,26 @@ class ValidationReport(BaseModel):
         doctype: str | None = None,
         field: str | None = None,
         fix_hint: FixHint | None = None,
+        path: str | None = None,
+        rule_id: str | None = None,
     ) -> None:
-        formatted = f"[{rule}] DocType '{doctype}': {message}" if doctype else f"[{rule}] {message}"
+        tag = rule_id or rule
+        formatted = f"[{tag}] DocType '{doctype}': {message}" if doctype else f"[{tag}] {message}"
         self.warnings.append(formatted)
         self.detailed_errors.append(
             ValidationErrorItem(
-                rule=rule, doctype=doctype, field=field, message=message, severity="warning"
+                rule=rule,
+                rule_id=rule_id or rule,
+                path=path,
+                doctype=doctype,
+                field=field,
+                message=message,
+                severity="warning",
             )
         )
         if fix_hint:
+            if not fix_hint.rule_id:
+                fix_hint.rule_id = rule_id or rule
+            if not fix_hint.path:
+                fix_hint.path = path
             self.fix_hints.append(fix_hint)

@@ -6,13 +6,13 @@ Each template is a Python code string with {placeholder} variables
 that the LLM adapts to the specific DocType and purpose.
 """
 
-from .overlap_check import TEMPLATE as overlap_check
 from .compute_totals import TEMPLATE as compute_totals
 from .create_document_on_submit import TEMPLATE as create_document_on_submit
-from .validate_required_child_rows import TEMPLATE as validate_required_child_rows
-from .update_linked_status import TEMPLATE as update_linked_status
 from .fetch_and_validate import TEMPLATE as fetch_and_validate
+from .overlap_check import TEMPLATE as overlap_check
 from .scheduled_reminder import TEMPLATE as scheduled_reminder
+from .update_linked_status import TEMPLATE as update_linked_status
+from .validate_required_child_rows import TEMPLATE as validate_required_child_rows
 
 SNIPPET_LIBRARY = {
     "overlap_check": overlap_check,

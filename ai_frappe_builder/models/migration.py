@@ -31,13 +31,174 @@ def _to_snake_case(s: str) -> str:
     return re.sub(r"[\s-]+", "_", s) or "custom_app"
 
 
+def normalize_workflows(spec: AppSpecV2) -> AppSpecV2:
+    """Post-processing normalization ensuring idiomatic, valid Frappe v15 workflows."""
+    if not spec.app:
+        return spec
+
+    app = spec.app
+    roles_set = set(app.roles)
+
+    # 1. Synthesize workflow for any DocType with a lifecycle if none exists
+    existing_wf_doctypes = {wf.document_type for wf in app.workflows}
+    for dt in app.doctypes:
+        if dt.istable or dt.name in existing_wf_doctypes:
+            continue
+        status_field = next(
+            (f for f in dt.fields if f.fieldname == "status" and f.fieldtype == "Select" and f.options),
+            None,
+        )
+        if status_field and status_field.options:
+            raw_options = [opt.strip() for opt in status_field.options.splitlines() if opt.strip()]
+            if len(raw_options) >= 2:
+                primary_role = app.roles[0] if app.roles else "System Manager"
+                states: list[WorkflowState] = []
+                transitions: list[WorkflowTransition] = []
+                for idx, opt in enumerate(raw_options):
+                    is_sub = (
+                        1
+                        if (dt.is_submittable and idx > 0)
+                        or any(w in opt.lower() for w in ["submit", "approv", "active", "closed", "complet"])
+                        else 0
+                    )
+                    if any(w in opt.lower() for w in ["cancel", "reject"]):
+                        is_sub = 2 if dt.is_submittable else 0
+                    style = "Success" if is_sub == 1 else ("Danger" if is_sub == 2 else "")
+                    states.append(
+                        WorkflowState(
+                            state=opt,
+                            doc_status=is_sub,
+                            style=style,
+                            allow_edit=primary_role,
+                        )
+                    )
+                    if idx > 0:
+                        transitions.append(
+                            WorkflowTransition(
+                                state=raw_options[idx - 1],
+                                action=f"Mark as {opt}",
+                                next_state=opt,
+                                allowed=primary_role,
+                            )
+                        )
+                app.workflows.append(
+                    WorkflowSpec(
+                        name=f"{dt.name} Workflow",
+                        document_type=dt.name,
+                        workflow_state_field="workflow_state",
+                        is_active=1,
+                        states=states,
+                        transitions=transitions,
+                    )
+                )
+
+    # 2. Normalize all workflows
+    for wf in app.workflows:
+        dt = next((d for d in app.doctypes if d.name == wf.document_type), None)
+        if not dt:
+            continue
+
+        state_names = [s.state for s in wf.states]
+        has_submittable = any(s.doc_status >= 1 for s in wf.states)
+
+        # DocType.is_submittable must be True if any state doc_status >= 1
+        if has_submittable:
+            dt.is_submittable = True
+
+        # Remove hand-rolled status Select field duplicating workflow states
+        dt.fields = [
+            f
+            for f in dt.fields
+            if not (
+                f.fieldname == "status"
+                and (f.fieldtype == "Select" or set((f.options or "").splitlines()) == set(state_names))
+            )
+        ]
+
+        # Ensure workflow_state field exists with correct configuration
+        wf_field_name = wf.workflow_state_field or "workflow_state"
+        wf_field = next((f for f in dt.fields if f.fieldname == wf_field_name), None)
+        newline_options = "\n".join(state_names)
+        if wf_field:
+            wf_field.fieldtype = "Select"
+            wf_field.options = newline_options
+            wf_field.read_only = True
+            wf_field.in_list_view = True
+            wf_field.in_standard_filter = True
+            if has_submittable:
+                wf_field.allow_on_submit = True
+        else:
+            dt.fields.append(
+                FieldSpec(
+                    fieldname=wf_field_name,
+                    label="Workflow State",
+                    fieldtype="Select",
+                    options=newline_options,
+                    read_only=True,
+                    in_list_view=True,
+                    in_standard_filter=True,
+                    allow_on_submit=has_submittable,
+                )
+            )
+
+        # Collect roles and check permissions
+        allow_edit_roles = {s.allow_edit for s in wf.states if s.allow_edit}
+        state_doc_status = {s.state: s.doc_status for s in wf.states}
+        submit_roles = {
+            t.allowed
+            for t in wf.transitions
+            if state_doc_status.get(t.next_state, 0) == 1 and t.allowed
+        }
+        cancel_roles = {
+            t.allowed
+            for t in wf.transitions
+            if state_doc_status.get(t.next_state, 0) == 2 and t.allowed
+        }
+        all_wf_roles = allow_edit_roles | {t.allowed for t in wf.transitions if t.allowed}
+
+        for role in all_wf_roles:
+            if role not in roles_set:
+                app.roles.append(role)
+                roles_set.add(role)
+
+        existing_perm_roles = {p.role: p for p in dt.permissions}
+        for role in all_wf_roles:
+            is_write = role in allow_edit_roles
+            is_submit = role in submit_roles
+            is_cancel = role in cancel_roles
+
+            if role in existing_perm_roles:
+                perm = existing_perm_roles[role]
+                perm.read = True
+                if is_write:
+                    perm.write = True
+                if is_submit:
+                    perm.submit = True
+                if is_cancel:
+                    perm.cancel = True
+            else:
+                dt.permissions.append(
+                    PermissionSpec(
+                        role=role,
+                        read=True,
+                        write=is_write,
+                        create=is_write,
+                        submit=is_submit,
+                        cancel=is_cancel,
+                    )
+                )
+
+    return spec
+
+
 def migrate_v1_to_v2(raw: dict[str, Any]) -> AppSpecV2:
     """
     Deterministically transforms a legacy 1.0 AppSpec dictionary into an authoritative AppSpecV2.
     """
     version = str(raw.get("spec_version", "1.0"))
     if version == "2.0":
-        return AppSpecV2.model_validate(raw)
+        spec = AppSpecV2.model_validate(raw)
+        return normalize_workflows(spec)
 
     status = raw.get("status", "needs_input")
     if status not in {"ready", "needs_input", "drafting", "validating", "failed"}:
@@ -198,9 +359,16 @@ def migrate_v1_to_v2(raw: dict[str, Any]) -> AppSpecV2:
                     else:
                         d_status = 0
                 allow_edit = sd.get("allow_edit", "System Manager")
+                raw_style = str(sd.get("style", "")).capitalize()
+                style_val = raw_style if raw_style in ("Success", "Warning", "Danger", "Primary") else ""
                 states.append(
                     WorkflowState(
-                        state=sd.get("state", "Draft"), doc_status=d_status, allow_edit=allow_edit
+                        state=sd.get("state", "Draft"),
+                        doc_status=d_status,
+                        style=style_val,
+                        allow_edit=allow_edit,
+                        update_field=sd.get("update_field"),
+                        update_value=sd.get("update_value"),
                     )
                 )
 
@@ -208,6 +376,7 @@ def migrate_v1_to_v2(raw: dict[str, Any]) -> AppSpecV2:
             for t in wd.get("transitions", []):
                 td = dict(t)
                 allowed = td.get("allowed") or td.get("allow_role") or "System Manager"
+                allow_self = 1 if td.get("allow_self_approval", 1) in (1, True, "1") else 0
                 transitions.append(
                     WorkflowTransition(
                         state=td.get("state", "Draft"),
@@ -215,6 +384,7 @@ def migrate_v1_to_v2(raw: dict[str, Any]) -> AppSpecV2:
                         next_state=td.get("next_state", "Approved"),
                         allowed=allowed,
                         condition=td.get("condition"),
+                        allow_self_approval=allow_self,
                     )
                 )
 
@@ -223,7 +393,7 @@ def migrate_v1_to_v2(raw: dict[str, Any]) -> AppSpecV2:
                     name=w_name,
                     document_type=doc_type,
                     workflow_state_field=wd.get("workflow_state_field", "workflow_state"),
-                    is_active=bool(wd.get("is_active", True)),
+                    is_active=1 if wd.get("is_active", 1) in (1, True, "1") else 0,
                     states=states,
                     transitions=transitions,
                 )
@@ -315,7 +485,7 @@ def migrate_v1_to_v2(raw: dict[str, Any]) -> AppSpecV2:
             reports=reports,
         )
 
-    return AppSpecV2(
+    spec = AppSpecV2(
         spec_version="2.0",
         status=status,
         archetype=raw.get("archetype"),
@@ -323,3 +493,4 @@ def migrate_v1_to_v2(raw: dict[str, Any]) -> AppSpecV2:
         assumptions=assumptions,
         app=app_meta,
     )
+    return normalize_workflows(spec)

@@ -46,6 +46,28 @@ export const api = {
     return res.data;
   },
 
+  async updatePlan(sessionId: string, app: any): Promise<any> {
+    const res = await client.put(`/api/v1/plan/${sessionId}`, { app });
+    return res.data;
+  },
+
+  async applySession(
+    sessionId: string,
+    credentials?: { frappe_url?: string; frappe_api_key?: string; frappe_api_secret?: string }
+  ): Promise<any> {
+    const res = await client.post(`/api/v1/apply/${sessionId}`, credentials || {});
+    return res.data;
+  },
+
+  async testFrappeConnection(url: string, key: string, secret: string): Promise<any> {
+    const res = await client.post('/api/v1/chat/test-connection', {
+      frappe_url: url,
+      frappe_api_key: key,
+      frappe_api_secret: secret,
+    });
+    return res.data;
+  },
+
   async exportApp(sessionId: string, gitRemote?: string): Promise<any> {
     const res = await client.post(`/api/v1/export/${sessionId}`, {
       output_dir: '/tmp/frappe_exports',
@@ -86,6 +108,16 @@ export const api = {
         console.error('Failed to parse SSE event data', err);
       }
     };
+    es.addEventListener('interview_turn', (e: any) => {
+      try {
+        onEvent('interview_turn', JSON.parse(e.data));
+      } catch {}
+    });
+    es.addEventListener('message', (e: any) => {
+      try {
+        onEvent('message', JSON.parse(e.data));
+      } catch {}
+    });
     es.addEventListener('token', (e: any) => {
       try {
         onEvent('token', JSON.parse(e.data));
@@ -109,6 +141,16 @@ export const api = {
     es.addEventListener('spec_patch', (e: any) => {
       try {
         onEvent('spec_patch', JSON.parse(e.data));
+      } catch {}
+    });
+    es.addEventListener('subagent_activity', (e: any) => {
+      try {
+        onEvent('subagent_activity', JSON.parse(e.data));
+      } catch {}
+    });
+    es.addEventListener('qa_report', (e: any) => {
+      try {
+        onEvent('qa_report', JSON.parse(e.data));
       } catch {}
     });
     return es;

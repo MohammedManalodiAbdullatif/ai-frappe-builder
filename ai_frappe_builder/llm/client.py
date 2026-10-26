@@ -171,7 +171,13 @@ class LLMClient:
                             if isinstance(response_schema, type) and issubclass(
                                 response_schema, BaseModel
                             ):
-                                return response_schema.model_validate(parsed_json).model_dump()
+                                try:
+                                    return response_schema.model_validate(parsed_json).model_dump()
+                                except Exception as val_err:
+                                    if getattr(response_schema, "__name__", "") == "AppSpecV2":
+                                        from ai_frappe_builder.models.migration import migrate_v1_to_v2
+                                        return migrate_v1_to_v2(parsed_json).model_dump()
+                                    raise val_err
                             return cast(dict[str, Any], parsed_json if isinstance(parsed_json, dict) else {})
                         except json.JSONDecodeError as jde:
                             logger.warning(
@@ -188,6 +194,18 @@ class LLMClient:
             except Exception as e:
                 last_error = e
                 logger.warning("LLM call attempt %d failed: %s", attempt, e)
+                if attempt < max_retries:
+                    err_msg = str(e)
+                    payload["messages"] = list(messages) + [
+                        {"role": "assistant", "content": raw_text if "raw_text" in locals() else ""},
+                        {
+                            "role": "user",
+                            "content": (
+                                f"Your response caused an error: {err_msg}. "
+                                "Please fix the issue and return ONLY the valid JSON object adhering strictly to the schema."
+                            ),
+                        },
+                    ]
 
         trace.complete(status="error", error_message=str(last_error))
         self.tracer.record(trace)

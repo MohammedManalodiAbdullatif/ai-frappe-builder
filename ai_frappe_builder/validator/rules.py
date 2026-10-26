@@ -4,6 +4,7 @@ rules.py — Deterministic Frappe schema validation rules.
 
 from __future__ import annotations
 
+import ast
 import re
 
 from ai_frappe_builder.models.app_spec_v2 import (
@@ -405,63 +406,396 @@ def validate_layout_breaks(dt: DocTypeSpec, report: ValidationReport) -> None:
 def validate_workflows(
     workflows: list[WorkflowSpec],
     doctypes_map: dict[str, DocTypeSpec],
+    app_roles: list[str],
     report: ValidationReport,
 ) -> None:
-    """Rule 8, 9 & Submittable consistency."""
+    """
+    Deterministic rules WF001 through WF011 for Frappe v15 workflows.
+    """
+    # WF008: at most one workflow per document_type
+    seen_wf_doctypes: dict[str, str] = {}
     for wf in workflows:
-        # Check minimum states and transitions
-        if len(wf.states) < 2:
+        if wf.document_type in seen_wf_doctypes:
             report.add_error(
-                rule="workflow_insufficient_states",
-                message=f"Workflow '{wf.name}' must have at least 2 states, got {len(wf.states)}.",
+                rule="workflow_multiple_per_doctype",
+                rule_id="WF008",
+                path=f"workflows/{wf.name}",
+                doctype=wf.document_type,
+                message=f"At most one workflow allowed per document_type; duplicate workflow '{wf.name}' for '{wf.document_type}' (first: '{seen_wf_doctypes[wf.document_type]}').",
             )
-        if len(wf.transitions) < 1:
-            report.add_error(
-                rule="workflow_insufficient_transitions",
-                message=f"Workflow '{wf.name}' must have at least 1 transition, got {len(wf.transitions)}.",
-            )
+        else:
+            seen_wf_doctypes[wf.document_type] = wf.name
+
+    for wf_idx, wf in enumerate(workflows):
+        wf_path = f"app/workflows/{wf_idx}"
+        target_dt = doctypes_map.get(wf.document_type)
 
         state_names = {s.state for s in wf.states}
-        has_submitted_state = False
+        state_map = {s.state: s for s in wf.states}
 
-        for s in wf.states:
-            if s.doc_status not in (0, 1, 2):
-                report.add_error(
-                    rule="workflow_invalid_doc_status",
-                    message=f"Workflow '{wf.name}' state '{s.state}' has invalid doc_status {s.doc_status} (must be 0, 1, or 2).",
-                )
-            if s.doc_status == 1:
-                has_submitted_state = True
-
-        for t in wf.transitions:
+        # WF001: every transition.state and next_state exists in states[]
+        for t_idx, t in enumerate(wf.transitions):
+            t_path = f"{wf_path}/transitions/{t_idx}"
             if t.state not in state_names:
                 report.add_error(
                     rule="workflow_unknown_source_state",
-                    message=f"Workflow '{wf.name}' transition source state '{t.state}' is not defined in states.",
+                    rule_id="WF001",
+                    path=f"{t_path}/state",
+                    doctype=wf.document_type,
+                    message=f"Transition state '{t.state}' does not exist in workflow states list.",
+                    fix_hint=FixHint(
+                        rule="WF001",
+                        rule_id="WF001",
+                        path=f"{wf_path}/states",
+                        doctype=wf.document_type,
+                        message=f"Add missing state '{t.state}' to workflow states.",
+                        suggested_patch={
+                            "op": "add",
+                            "path": f"/{wf_path}/states/-",
+                            "value": {"state": t.state, "doc_status": 0, "style": "", "allow_edit": "System Manager"},
+                        },
+                    ),
                 )
             if t.next_state not in state_names:
                 report.add_error(
                     rule="workflow_unknown_next_state",
-                    message=f"Workflow '{wf.name}' transition next_state '{t.next_state}' is not defined in states.",
+                    rule_id="WF001",
+                    path=f"{t_path}/next_state",
+                    doctype=wf.document_type,
+                    message=f"Transition next_state '{t.next_state}' does not exist in workflow states list.",
+                    fix_hint=FixHint(
+                        rule="WF001",
+                        rule_id="WF001",
+                        path=f"{wf_path}/states",
+                        doctype=wf.document_type,
+                        message=f"Add missing state '{t.next_state}' to workflow states.",
+                        suggested_patch={
+                            "op": "add",
+                            "path": f"/{wf_path}/states/-",
+                            "value": {"state": t.next_state, "doc_status": 0, "style": "", "allow_edit": "System Manager"},
+                        },
+                    ),
                 )
 
-        # Cross check is_submittable with target doctype
-        target_dt = doctypes_map.get(wf.document_type)
-        if target_dt:
-            if has_submitted_state and not target_dt.is_submittable:
+        # Incoming transitions analysis for WF002 and WF003
+        incoming_counts: dict[str, int] = dict.fromkeys(state_names, 0)
+        for t in wf.transitions:
+            if t.next_state in incoming_counts:
+                incoming_counts[t.next_state] += 1
+
+        zero_incoming = [s for s, count in incoming_counts.items() if count == 0]
+        first_state = wf.states[0].state if wf.states else None
+
+        # WF002: exactly one initial state (no incoming transitions) and it has doc_status 0
+        if len(zero_incoming) != 1:
+            report.add_error(
+                rule="workflow_initial_state_count",
+                rule_id="WF002",
+                path=f"{wf_path}/states",
+                doctype=wf.document_type,
+                message=f"Workflow must have exactly one initial state with no incoming transitions; found {len(zero_incoming)} ({sorted(zero_incoming)}).",
+            )
+        elif first_state and incoming_counts.get(first_state, 0) > 0:
+            report.add_error(
+                rule="workflow_initial_state_incoming",
+                rule_id="WF002",
+                path=f"{wf_path}/states/0",
+                doctype=wf.document_type,
+                message=f"Initial state '{first_state}' must have 0 incoming transitions.",
+            )
+
+        if zero_incoming:
+            init_state = state_map.get(zero_incoming[0])
+            if init_state and init_state.doc_status != 0:
                 report.add_error(
-                    rule="workflow_submittable_mismatch",
-                    message=(
-                        f"DocType '{target_dt.name}' has a workflow with doc_status=1 (Submitted), "
-                        f"but is_submittable is false."
-                    ),
-                    doctype=target_dt.name,
+                    rule="workflow_initial_state_doc_status",
+                    rule_id="WF002",
+                    path=f"{wf_path}/states",
+                    doctype=wf.document_type,
+                    message=f"Initial state '{init_state.state}' must have doc_status 0 (Draft), got {init_state.doc_status}.",
                     fix_hint=FixHint(
-                        rule="workflow_submittable_mismatch",
-                        doctype=target_dt.name,
-                        message="Set is_submittable: true on DocType.",
+                        rule="WF002",
+                        rule_id="WF002",
+                        path=f"{wf_path}/states",
+                        doctype=wf.document_type,
+                        message=f"Set doc_status of initial state '{init_state.state}' to 0.",
                     ),
                 )
+
+        # WF003: no unreachable state (every non-initial state has >= 1 incoming transition)
+        for idx, s in enumerate(wf.states):
+            if idx > 0 and incoming_counts.get(s.state, 0) == 0:
+                report.add_error(
+                    rule="workflow_unreachable_state",
+                    rule_id="WF003",
+                    path=f"{wf_path}/states/{idx}",
+                    doctype=wf.document_type,
+                    message=f"Unreachable state '{s.state}': non-initial state has no incoming transitions.",
+                )
+
+        # WF004: every allowed / allow_edit role exists in app.roles AND has a permission row on document_type
+        roles_set = set(app_roles)
+        roles_set.add("System Manager")  # Standard built-in role
+        dt_perm_roles = {p.role for p in target_dt.permissions} if target_dt else set()
+
+        for s_idx, s in enumerate(wf.states):
+            if s.allow_edit:
+                if s.allow_edit not in roles_set:
+                    report.add_error(
+                        rule="workflow_role_not_in_app",
+                        rule_id="WF004",
+                        path=f"{wf_path}/states/{s_idx}/allow_edit",
+                        doctype=wf.document_type,
+                        message=f"Role '{s.allow_edit}' in state allow_edit does not exist in app.roles.",
+                        fix_hint=FixHint(
+                            rule="WF004",
+                            rule_id="WF004",
+                            path="app/roles",
+                            doctype=wf.document_type,
+                            message=f"Add role '{s.allow_edit}' to app.roles.",
+                            suggested_patch={"op": "add", "path": "/app/roles/-", "value": s.allow_edit},
+                        ),
+                    )
+                if target_dt and s.allow_edit not in dt_perm_roles:
+                    report.add_error(
+                        rule="workflow_role_missing_permission",
+                        rule_id="WF004",
+                        path=f"app/doctypes/{target_dt.name}/permissions",
+                        doctype=wf.document_type,
+                        message=f"Role '{s.allow_edit}' in state allow_edit has no permission row on DocType '{target_dt.name}'.",
+                        fix_hint=FixHint(
+                            rule="WF004",
+                            rule_id="WF004",
+                            path=f"app/doctypes/{target_dt.name}/permissions",
+                            doctype=target_dt.name,
+                            message=f"Add permission row for role '{s.allow_edit}' on DocType '{target_dt.name}'.",
+                            suggested_patch={
+                                "op": "add",
+                                "path": f"/app/doctypes/{target_dt.name}/permissions/-",
+                                "value": {"role": s.allow_edit, "read": True, "write": True, "create": False, "delete": False},
+                            },
+                        ),
+                    )
+
+        for t_idx, t in enumerate(wf.transitions):
+            if t.allowed:
+                if t.allowed not in roles_set:
+                    report.add_error(
+                        rule="workflow_role_not_in_app",
+                        rule_id="WF004",
+                        path=f"{wf_path}/transitions/{t_idx}/allowed",
+                        doctype=wf.document_type,
+                        message=f"Role '{t.allowed}' in transition allowed does not exist in app.roles.",
+                        fix_hint=FixHint(
+                            rule="WF004",
+                            rule_id="WF004",
+                            path="app/roles",
+                            doctype=wf.document_type,
+                            message=f"Add role '{t.allowed}' to app.roles.",
+                            suggested_patch={"op": "add", "path": "/app/roles/-", "value": t.allowed},
+                        ),
+                    )
+                if target_dt and t.allowed not in dt_perm_roles:
+                    report.add_error(
+                        rule="workflow_role_missing_permission",
+                        rule_id="WF004",
+                        path=f"app/doctypes/{target_dt.name}/permissions",
+                        doctype=wf.document_type,
+                        message=f"Role '{t.allowed}' in transition allowed has no permission row on DocType '{target_dt.name}'.",
+                        fix_hint=FixHint(
+                            rule="WF004",
+                            rule_id="WF004",
+                            path=f"app/doctypes/{target_dt.name}/permissions",
+                            doctype=target_dt.name,
+                            message=f"Add permission row for role '{t.allowed}' on DocType '{target_dt.name}'.",
+                            suggested_patch={
+                                "op": "add",
+                                "path": f"/app/doctypes/{target_dt.name}/permissions/-",
+                                "value": {"role": t.allowed, "read": True, "write": False, "create": False, "delete": False},
+                            },
+                        ),
+                    )
+
+        # WF005: workflow_state_field exists on document_type, fieldtype Select or Link(Workflow State), read_only 1
+        wf_field_name = wf.workflow_state_field or "workflow_state"
+        if target_dt:
+            wf_field = next((f for f in target_dt.fields if f.fieldname == wf_field_name), None)
+            expected_options = "\n".join(s.state for s in wf.states)
+            if not wf_field:
+                report.add_error(
+                    rule="workflow_state_field_missing",
+                    rule_id="WF005",
+                    path=f"app/doctypes/{target_dt.name}/fields",
+                    doctype=target_dt.name,
+                    field=wf_field_name,
+                    message=f"workflow_state_field '{wf_field_name}' does not exist on DocType '{target_dt.name}'.",
+                    fix_hint=FixHint(
+                        rule="WF005",
+                        rule_id="WF005",
+                        path=f"app/doctypes/{target_dt.name}/fields",
+                        doctype=target_dt.name,
+                        field=wf_field_name,
+                        message=f"Add '{wf_field_name}' field to DocType '{target_dt.name}'.",
+                        suggested_patch={
+                            "op": "add",
+                            "path": f"/app/doctypes/{target_dt.name}/fields/-",
+                            "value": {
+                                "fieldname": wf_field_name,
+                                "label": "Workflow State",
+                                "fieldtype": "Select",
+                                "options": expected_options,
+                                "read_only": True,
+                                "in_list_view": True,
+                                "in_standard_filter": True,
+                            },
+                        },
+                    ),
+                )
+            else:
+                if wf_field.fieldtype not in ("Select", "Link") or (
+                    wf_field.fieldtype == "Link" and wf_field.options != "Workflow State"
+                ):
+                    report.add_error(
+                        rule="workflow_state_field_type_invalid",
+                        rule_id="WF005",
+                        path=f"app/doctypes/{target_dt.name}/fields/{wf_field_name}/fieldtype",
+                        doctype=target_dt.name,
+                        field=wf_field_name,
+                        message=f"Field '{wf_field_name}' must be Select or Link (options: 'Workflow State'), got {wf_field.fieldtype}.",
+                    )
+                if not wf_field.read_only:
+                    report.add_error(
+                        rule="workflow_state_field_not_readonly",
+                        rule_id="WF005",
+                        path=f"app/doctypes/{target_dt.name}/fields/{wf_field_name}/read_only",
+                        doctype=target_dt.name,
+                        field=wf_field_name,
+                        message=f"Field '{wf_field_name}' must have read_only == 1.",
+                        fix_hint=FixHint(
+                            rule="WF005",
+                            rule_id="WF005",
+                            path=f"app/doctypes/{target_dt.name}/fields/{wf_field_name}/read_only",
+                            doctype=target_dt.name,
+                            field=wf_field_name,
+                            message=f"Set read_only: true on field '{wf_field_name}'.",
+                        ),
+                    )
+
+                # WF011: Select options of workflow_state field exactly equal the set of state names
+                if wf_field.fieldtype == "Select":
+                    raw_opts = (wf_field.options or "").strip().split("\n")
+                    field_opts = {o.strip() for o in raw_opts if o.strip()}
+                    if field_opts != state_names:
+                        report.add_error(
+                            rule="workflow_state_options_mismatch",
+                            rule_id="WF011",
+                            path=f"app/doctypes/{target_dt.name}/fields/{wf_field_name}/options",
+                            doctype=target_dt.name,
+                            field=wf_field_name,
+                            message=f"Select options on '{wf_field_name}' ({sorted(field_opts)}) do not match workflow states ({sorted(state_names)}).",
+                            fix_hint=FixHint(
+                                rule="WF011",
+                                rule_id="WF011",
+                                path=f"app/doctypes/{target_dt.name}/fields/{wf_field_name}/options",
+                                doctype=target_dt.name,
+                                field=wf_field_name,
+                                message=f"Update Select options on '{wf_field_name}' to match state names.",
+                                suggested_patch={
+                                    "op": "replace",
+                                    "path": f"/app/doctypes/{target_dt.name}/fields/{wf_field_name}/options",
+                                    "value": expected_options,
+                                },
+                            ),
+                        )
+
+        # WF006: doc_status never decreases along a transition (0->1->2 only; 1->0 is an error)
+        for t_idx, t in enumerate(wf.transitions):
+            s_from = state_map.get(t.state)
+            s_to = state_map.get(t.next_state)
+            if s_from and s_to:
+                if s_to.doc_status < s_from.doc_status:
+                    report.add_error(
+                        rule="workflow_doc_status_decreasing",
+                        rule_id="WF006",
+                        path=f"{wf_path}/transitions/{t_idx}",
+                        doctype=wf.document_type,
+                        message=f"doc_status cannot decrease along transition '{t.state}' ({s_from.doc_status}) -> '{t.next_state}' ({s_to.doc_status}).",
+                    )
+
+        # WF007: if any state doc_status >= 1 then DocType.is_submittable == 1
+        has_submittable_state = any(s.doc_status >= 1 for s in wf.states)
+        if target_dt and has_submittable_state and not target_dt.is_submittable:
+            report.add_error(
+                rule="workflow_submittable_mismatch",
+                rule_id="WF007",
+                path=f"app/doctypes/{target_dt.name}/is_submittable",
+                doctype=target_dt.name,
+                message=f"DocType '{target_dt.name}' has workflow states with doc_status >= 1, but is_submittable is not 1.",
+                fix_hint=FixHint(
+                    rule="WF007",
+                    rule_id="WF007",
+                    path=f"app/doctypes/{target_dt.name}/is_submittable",
+                    doctype=target_dt.name,
+                    message=f"Set is_submittable: true on DocType '{target_dt.name}'.",
+                    suggested_patch={
+                        "op": "replace",
+                        "path": f"/app/doctypes/{target_dt.name}/is_submittable",
+                        "value": True,
+                    },
+                ),
+            )
+
+        # WF009: no duplicate (state, action) pair in transitions
+        seen_transitions: set[tuple[str, str]] = set()
+        for t_idx, t in enumerate(wf.transitions):
+            key = (t.state.strip(), t.action.strip())
+            if key in seen_transitions:
+                report.add_error(
+                    rule="workflow_duplicate_transition",
+                    rule_id="WF009",
+                    path=f"{wf_path}/transitions/{t_idx}",
+                    doctype=wf.document_type,
+                    message=f"Duplicate transition for state '{t.state}' and action '{t.action}'.",
+                    fix_hint=FixHint(
+                        rule="WF009",
+                        rule_id="WF009",
+                        path=f"{wf_path}/transitions/{t_idx}",
+                        doctype=wf.document_type,
+                        message=f"Drop duplicate transition '{t.state}' -> '{t.action}'.",
+                        suggested_patch={
+                            "op": "remove",
+                            "path": f"/{wf_path}/transitions/{t_idx}",
+                        },
+                    ),
+                )
+            else:
+                seen_transitions.add(key)
+
+        # WF010: transition.condition, if present, parses with ast.parse(mode="eval") and references only doc, frappe, user
+        ALLOWED_CONDITION_NAMES = {"doc", "frappe", "user", "True", "False", "None"}
+        for t_idx, t in enumerate(wf.transitions):
+            if t.condition and t.condition.strip():
+                cond = t.condition.strip()
+                try:
+                    tree = ast.parse(cond, mode="eval")
+                    names_used = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+                    disallowed = names_used - ALLOWED_CONDITION_NAMES
+                    if disallowed:
+                        report.add_error(
+                            rule="workflow_condition_disallowed_identifier",
+                            rule_id="WF010",
+                            path=f"{wf_path}/transitions/{t_idx}/condition",
+                            doctype=wf.document_type,
+                            message=f"Transition condition '{cond}' references disallowed identifiers: {sorted(disallowed)}. Allowed: doc, frappe, user.",
+                        )
+                except SyntaxError as e:
+                    report.add_error(
+                        rule="workflow_condition_syntax_error",
+                        rule_id="WF010",
+                        path=f"{wf_path}/transitions/{t_idx}/condition",
+                        doctype=wf.document_type,
+                        message=f"Transition condition '{cond}' is not valid Python syntax: {e}.",
+                    )
 
 
 def validate_circular_mandatory_links(

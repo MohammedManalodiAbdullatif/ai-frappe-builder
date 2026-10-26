@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from ai_frappe_builder.agents.base import BaseAgent
 from ai_frappe_builder.models.app_spec_v2 import AppSpecV2
-from ai_frappe_builder.models.migration import migrate_v1_to_v2
+from ai_frappe_builder.models.migration import migrate_v1_to_v2, normalize_workflows
 
 logger = logging.getLogger(__name__)
 
@@ -66,5 +66,10 @@ class ArchitectAgent(BaseAgent[ArchitectInput, AppSpecV2]):
 
         if isinstance(raw_output, dict):
             # Normalize via migration if necessary
-            return migrate_v1_to_v2(raw_output)
-        return AppSpecV2(status="failed")
+            spec = migrate_v1_to_v2(raw_output)
+        elif isinstance(raw_output, AppSpecV2):
+            spec = raw_output
+        else:
+            return AppSpecV2(status="failed")
+
+        return normalize_workflows(spec)

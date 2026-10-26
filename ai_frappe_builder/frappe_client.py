@@ -46,7 +46,7 @@ class FrappeClient:
         }
         self._client: httpx.AsyncClient | None = None
 
-    async def __aenter__(self) -> "FrappeClient":
+    async def __aenter__(self) -> FrappeClient:
         self._client = httpx.AsyncClient(
             base_url=self.base_url,
             headers=self._headers,
@@ -109,9 +109,23 @@ class FrappeClient:
             apps = data.get("message", [])
             return [a.get("app_name", "") for a in apps if isinstance(a, dict)]
         except FrappeAPIError:
-            # Fallback: try the simpler endpoint
+            pass
+
+        try:
+            data = await self._get(
+                "/api/resource/Installed Applications/Installed Applications"
+            )
+            apps = data.get("data", {}).get("installed_applications", [])
+            if apps:
+                return [a.get("app_name", "") for a in apps if a.get("app_name")]
+        except FrappeAPIError:
+            pass
+
+        try:
             data = await self._get("/api/method/frappe.get_installed_apps")
             return data.get("message", [])
+        except FrappeAPIError:
+            return ["frappe"]
 
     async def get_all_doctypes(self) -> list[dict]:
         """Return list of all DocType meta dicts (name + module at minimum)."""
@@ -133,6 +147,26 @@ class FrappeClient:
             params={"fields": '["name"]', "limit_page_length": 500},
         )
         return [m["name"] for m in data.get("data", [])]
+
+    async def module_exists(self, module_name: str) -> bool:
+        """Check if a Module Def exists on the site."""
+        try:
+            await self._get(f"/api/resource/Module Def/{module_name}")
+            return True
+        except FrappeAPIError as exc:
+            if exc.status_code == 404:
+                return False
+            raise
+
+    async def create_module(self, module_name: str, app_name: str = "frappe") -> dict:
+        """Create a new Module Def if missing."""
+        payload = {
+            "doctype": "Module Def",
+            "module_name": module_name,
+            "app_name": app_name,
+            "custom": 1,
+        }
+        return await self._post("/api/resource/Module Def", payload)
 
     async def get_all_roles(self) -> list[str]:
         """Return list of all Role names on the site."""

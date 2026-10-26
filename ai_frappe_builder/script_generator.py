@@ -14,10 +14,8 @@ from __future__ import annotations
 
 import ast
 import logging
-from typing import Optional
 
 import httpx
-
 from config import get_settings
 from snippets import SNIPPET_LIBRARY
 

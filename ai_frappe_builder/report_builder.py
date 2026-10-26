@@ -8,7 +8,7 @@ import json
 import logging
 from typing import Any
 
-from frappe_client import FrappeClient, FrappeAPIError
+from frappe_client import FrappeClient
 
 logger = logging.getLogger(__name__)
 

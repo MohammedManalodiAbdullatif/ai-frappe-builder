@@ -36,10 +36,14 @@ def test_bench_runner_local_verification(tmp_path: Path) -> None:
     result = runner.run_tests(app_path=res["app_path"], app_name=res["app_name"])
 
     assert isinstance(result, BenchExecutionResult)
-    assert result.passed is True
+    if runner.is_docker_available():
+        assert result.passed is True
+        assert result.execution_mode == "docker_container"
+    else:
+        assert result.passed is False
+        assert result.execution_mode == "static_only"
     assert result.failed_tests == 0
     assert result.total_tests > 5
-    assert result.execution_mode in ("docker_container", "local_verification")
 
 
 def test_bench_runner_missing_directory() -> None:
@@ -62,5 +66,10 @@ async def test_qa_agent_execution(tmp_path: Path) -> None:
 
     assert isinstance(qa_report, QAReport)
     assert qa_report.app_name == "field_service"
-    assert qa_report.passed is True
+    if agent.bench_runner.is_docker_available():
+        assert qa_report.passed is True
+        assert qa_report.execution_mode == "docker_container"
+    else:
+        assert qa_report.passed is False
+        assert qa_report.execution_mode == "static_only"
     assert qa_report.failed_tests == 0

@@ -9,7 +9,7 @@ import re
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ---------------------------------------------------------------------------
 # Field Types Enumeration (Frappe v15)
@@ -95,21 +95,53 @@ class FieldSpec(BaseModel):
     depends_on: str | None = None
     mandatory_depends_on: str | None = None
     read_only_depends_on: str | None = None
+    allow_on_submit: bool = False
     description: str | None = None
     precision: int | None = None
 
-    @field_validator("fieldname")
+    @field_validator("fieldname", mode="before")
     @classmethod
-    def fieldname_snake_case(cls, v: str) -> str:
-        s = v.strip().lower()
-        if not re.match(r"^[a-z][a-z0-9_]*$", s):
-            # Allow layout break fieldnames if auto-generated
-            if s.startswith(("section_break_", "column_break_", "tab_break_")):
-                return s
-            raise ValueError(
-                f"fieldname must be lowercase snake_case starting with a letter, got: {v!r}"
-            )
+    def fieldname_snake_case(cls, v: Any) -> str:
+        s = str(v).strip().lower()
+        if s.startswith(("section_break_", "column_break_", "tab_break_")):
+            return s
+        s = re.sub(r"[\s-]+", "_", s)
+        s = re.sub(r"[^a-z0-9_]", "", s)
+        if not s or not s[0].isalpha():
+            s = f"f_{s}" if s else "custom_field"
         return s
+
+    @field_validator("fieldtype", mode="before")
+    @classmethod
+    def coerce_fieldtype(cls, v: Any) -> str:
+        s = str(v).strip()
+        type_map = {
+            "str": "Data", "string": "Data", "varchar": "Data", "text_field": "Data",
+            "int": "Int", "integer": "Int", "number": "Int",
+            "bool": "Check", "boolean": "Check",
+            "float": "Float", "decimal": "Float", "double": "Float",
+            "datetime": "Datetime", "timestamp": "Datetime",
+            "date": "Date",
+            "time": "Time",
+            "link": "Link", "reference": "Link",
+            "table": "Table", "child_table": "Table",
+            "select": "Select", "dropdown": "Select",
+            "currency": "Currency", "money": "Currency",
+            "percent": "Percent", "percentage": "Percent",
+            "text": "Text", "long_text": "Long Text", "small_text": "Small Text",
+            "text_editor": "Text Editor", "html": "HTML", "code": "Code",
+            "attach": "Attach", "attachment": "Attach", "file": "Attach",
+            "attach_image": "Attach Image", "image": "Image",
+            "signature": "Signature", "rating": "Rating", "barcode": "Barcode",
+            "section_break": "Section Break", "column_break": "Column Break", "tab_break": "Tab Break"
+        }
+        lower = s.lower().replace(" ", "_")
+        if lower in type_map:
+            return type_map[lower]
+        for ft in FrappeFieldType:
+            if ft.value.lower() == s.lower():
+                return ft.value
+        return s or "Data"
 
 
 # ---------------------------------------------------------------------------
@@ -137,6 +169,13 @@ class PermissionSpec(BaseModel):
     permlevel: int = 0
 
     model_config = {"populate_by_name": True}
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def coerce_role(cls, v: Any) -> str:
+        if isinstance(v, dict):
+            return str(v.get("role") or v.get("name") or v.get("label") or "System Manager")
+        return str(v).strip() if v else "System Manager"
 
 
 # ---------------------------------------------------------------------------
@@ -174,35 +213,96 @@ class DocTypeSpec(BaseModel):
     fields: list[FieldSpec] = Field(default_factory=list)
     permissions: list[PermissionSpec] = Field(default_factory=list)
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_doctype_spec(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        d = dict(data)
+
+        # 1. Normalize name to Title Case
+        raw_name = d.get("name", "Custom DocType")
+        s = re.sub(r"[_\-]+", " ", str(raw_name).strip())
+        words = [w.capitalize() for w in s.split() if w]
+        d["name"] = " ".join(words) or "Custom DocType"
+
+        # 2. Kind & istable synchronization
+        raw_kind = str(d.get("kind", "")).lower()
+        if raw_kind == "child" or d.get("istable"):
+            d["kind"] = DocTypeKind.CHILD
+            d["istable"] = True
+            if not d.get("autoname") or d.get("autoname") == "Prompt":
+                d["autoname"] = "hash"
+            d["permissions"] = []
+        else:
+            if d.get("kind") not in [k.value for k in DocTypeKind]:
+                d["kind"] = DocTypeKind.MASTER
+
+        # 3. Default permissions if empty and not child
+        if not d.get("istable") and not d.get("permissions"):
+            d["permissions"] = [
+                {"role": "System Manager", "read": True, "write": True, "create": True, "delete": True}
+            ]
+
+        return d
+
     @field_validator("name")
     @classmethod
     def name_title_case(cls, v: str) -> str:
-        v = v.strip()
-        words = v.split()
-        if not words:
-            raise ValueError("DocType name cannot be empty")
-        for word in words:
-            if word and not word[0].isupper():
-                raise ValueError(f"DocType name must be Title Case. Got: {v!r}")
-        return v
+        s = re.sub(r"[_\-]+", " ", str(v).strip())
+        words = [w.capitalize() for w in s.split() if w]
+        return " ".join(words) or "Custom DocType"
 
 
 # ---------------------------------------------------------------------------
 # Workflow Specification
 # ---------------------------------------------------------------------------
 
+WorkflowStyle = Literal["Success", "Warning", "Danger", "Primary", ""]
+WorkflowDocStatus = Literal[0, 1, 2]
+
 
 class WorkflowState(BaseModel):
     """Single state in a Frappe Workflow."""
 
-    state: str
-    doc_status: int = Field(0, ge=0, le=2, description="0=Draft, 1=Submitted, 2=Cancelled")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    state: str = Field(..., description="Unique state identifier, e.g. Draft, Approved")
+    doc_status: WorkflowDocStatus = Field(0, description="0=Draft, 1=Submitted, 2=Cancelled")
+    style: WorkflowStyle = Field("", description="Frappe badge style (Success, Warning, Danger, Primary, or empty)")
     allow_edit: str = Field("System Manager", description="Role allowed to edit in this state")
+    update_field: str | None = Field(None, description="Optional DocType fieldname to update on entering state")
+    update_value: str | None = Field(None, description="Value to set in update_field on entering state")
     is_optional_state: bool = False
+
+    @field_validator("allow_edit", mode="before")
+    @classmethod
+    def coerce_allow_edit(cls, v: Any) -> str:
+        if isinstance(v, dict):
+            return str(v.get("role") or v.get("name") or "System Manager")
+        return str(v).strip() if v else "System Manager"
+
+    @field_validator("doc_status", mode="before")
+    @classmethod
+    def coerce_doc_status(cls, v: Any) -> int:
+        try:
+            return int(v) if v is not None else 0
+        except (ValueError, TypeError):
+            return 0
+
+    @field_validator("style", mode="before")
+    @classmethod
+    def coerce_style(cls, v: Any) -> str:
+        if not v:
+            return ""
+        s = str(v).strip().capitalize()
+        return s if s in ("Success", "Warning", "Danger", "Primary") else ""
 
 
 class WorkflowTransition(BaseModel):
     """Transition edge between two workflow states."""
+
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     state: str = Field(..., description="Source state")
     action: str = Field(..., description="Action trigger button label")
@@ -210,23 +310,49 @@ class WorkflowTransition(BaseModel):
     allowed: str = Field(
         "System Manager", alias="allow_role", description="Role allowed to trigger transition"
     )
-    condition: str | None = None
+    condition: str | None = Field(None, description="Python evaluation condition expression string")
+    allow_self_approval: Literal[0, 1] = Field(1, description="Allow self approval (1 or 0)")
 
-    model_config = {"populate_by_name": True}
+    @field_validator("allowed", mode="before")
+    @classmethod
+    def coerce_allowed(cls, v: Any) -> str:
+        if isinstance(v, dict):
+            return str(v.get("role") or v.get("name") or "System Manager")
+        return str(v).strip() if v else "System Manager"
+
+    @field_validator("allow_self_approval", mode="before")
+    @classmethod
+    def coerce_self_approval(cls, v: Any) -> int:
+        if isinstance(v, bool):
+            return 1 if v else 0
+        try:
+            return 1 if int(v) else 0
+        except (ValueError, TypeError):
+            return 1
 
 
 class WorkflowSpec(BaseModel):
     """Full Frappe Workflow definition."""
 
-    name: str
-    document_type: str = Field(..., alias="doctype")
-    workflow_state_field: str = "workflow_state"
-    is_active: bool = True
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    name: str = Field(..., description="Unique workflow name")
+    document_type: str = Field(..., alias="doctype", description="Target DocType name")
+    workflow_state_field: str = Field("workflow_state", description="State fieldname on target DocType")
+    is_active: Literal[0, 1] = Field(1, description="Workflow active flag (1 or 0)")
     send_email_alert: bool = False
     states: list[WorkflowState] = Field(default_factory=list)
     transitions: list[WorkflowTransition] = Field(default_factory=list)
 
-    model_config = {"populate_by_name": True}
+    @field_validator("is_active", mode="before")
+    @classmethod
+    def coerce_is_active(cls, v: Any) -> int:
+        if isinstance(v, bool):
+            return 1 if v else 0
+        try:
+            return 1 if int(v) else 0
+        except (ValueError, TypeError):
+            return 1
 
 
 # ---------------------------------------------------------------------------
@@ -365,12 +491,86 @@ class AppMetadata(BaseModel):
     dashboard_charts: list[DashboardChartSpec] = Field(default_factory=list)
     workspaces: list[WorkspaceSpec] = Field(default_factory=list)
 
+    @model_validator(mode="before")
+    @classmethod
+    def pre_validate_metadata(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        d = dict(data)
+
+        # 1. Resolve app_name & title
+        raw_name = d.get("app_name") or d.get("name") or d.get("appName") or d.get("title") or "custom_app"
+        s = re.sub(r"[^\w\s-]", "", str(raw_name)).strip().lower()
+        snake = re.sub(r"[\s-]+", "_", s)
+        if not snake or not snake[0].isalpha():
+            snake = f"app_{snake}" if snake else "custom_app"
+
+        if not d.get("app_name"):
+            d["app_name"] = snake
+        else:
+            norm_name = str(d["app_name"]).strip().lower().replace("-", "_")
+            norm_name = re.sub(r"[^\w]", "_", norm_name)
+            if not norm_name or not norm_name[0].isalpha():
+                norm_name = f"app_{norm_name}" if norm_name else "custom_app"
+            d["app_name"] = norm_name
+
+        if not d.get("title"):
+            raw_title = d.get("title") or d.get("name") or d.get("app_title") or snake.replace("_", " ").title()
+            d["title"] = str(raw_title).strip() or "Custom App"
+
+        # 2. Normalize roles: must be list[str]
+        raw_roles = d.get("roles")
+        cleaned_roles: list[str] = []
+        if isinstance(raw_roles, list):
+            for r in raw_roles:
+                if isinstance(r, dict):
+                    role_str = (
+                        r.get("role")
+                        or r.get("name")
+                        or r.get("label")
+                        or r.get("title")
+                        or ""
+                    )
+                    if role_str and str(role_str).strip():
+                        cleaned_roles.append(str(role_str).strip())
+                elif isinstance(r, str) and r.strip():
+                    cleaned_roles.append(r.strip())
+        elif isinstance(raw_roles, str) and raw_roles.strip():
+            cleaned_roles = [part.strip() for part in re.split(r"[,;\n]", raw_roles) if part.strip()]
+
+        if not cleaned_roles:
+            cleaned_roles = ["System Manager"]
+        elif "System Manager" not in cleaned_roles:
+            cleaned_roles.append("System Manager")
+
+        # Deduplicate while preserving order
+        d["roles"] = list(dict.fromkeys(cleaned_roles))
+
+        # 3. Normalize modules: must be list[str]
+        raw_modules = d.get("modules")
+        cleaned_modules: list[str] = []
+        if isinstance(raw_modules, list):
+            for m in raw_modules:
+                if isinstance(m, dict):
+                    mod_str = m.get("name") or m.get("module") or m.get("module_name") or ""
+                    if mod_str and str(mod_str).strip():
+                        cleaned_modules.append(str(mod_str).strip())
+                elif isinstance(m, str) and m.strip():
+                    cleaned_modules.append(m.strip())
+        elif isinstance(raw_modules, str) and raw_modules.strip():
+            cleaned_modules = [m.strip() for m in raw_modules.split(",") if m.strip()]
+
+        d["modules"] = cleaned_modules or ["Custom"]
+
+        return d
+
     @field_validator("app_name")
     @classmethod
     def app_name_snake_case(cls, v: str) -> str:
         s = v.strip().lower().replace("-", "_")
-        if not re.match(r"^[a-z][a-z0-9_]*$", s):
-            raise ValueError(f"app_name must be lowercase snake_case, got: {v!r}")
+        s = re.sub(r"[^\w]", "_", s)
+        if not s or not s[0].isalpha():
+            return f"app_{s}" if s else "custom_app"
         return s
 
 
@@ -413,6 +613,35 @@ class AppSpecV2(BaseModel):
     questions: list[InterviewQuestion] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
     app: AppMetadata | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def pre_validate_spec(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        d = dict(data)
+
+        # Force spec_version to "2.0"
+        d["spec_version"] = "2.0"
+
+        # Coerce status
+        valid_statuses = {"ready", "needs_input", "drafting", "validating", "failed"}
+        if d.get("status") not in valid_statuses:
+            d["status"] = "ready" if (d.get("app") or d.get("doctypes")) else "needs_input"
+
+        # If app is None or missing, but top-level has doctypes or app metadata
+        if not d.get("app"):
+            if "doctypes" in d or "app_name" in d or "name" in d:
+                meta_keys = {
+                    "app_name", "name", "title", "description", "publisher", "email",
+                    "license", "version", "frappe_version", "requires_erpnext", "modules",
+                    "roles", "doctypes", "workflows", "server_scripts", "client_scripts",
+                    "reports", "number_cards", "dashboard_charts", "workspaces",
+                }
+                app_payload = {k: d[k] for k in meta_keys if k in d}
+                d["app"] = app_payload
+
+        return d
 
     def get_doctypes(self) -> list[DocTypeSpec]:
         return self.app.doctypes if self.app else []

@@ -12,9 +12,9 @@ Tables:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from typing import Any
 import uuid
+from datetime import UTC, datetime
+
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -29,6 +29,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
 from ai_frappe_builder.config import get_settings
 
 settings = get_settings()
@@ -224,39 +225,50 @@ async def get_messages(db: AsyncSession, session_id: str) -> list[Message]:
 async def save_app_spec(
     db: AsyncSession,
     session_id: str,
-    spec_json: str,
-    validation_result: str | None = None,
+    spec_json: str | dict[str, Any],
+    validation_result: str | dict[str, Any] | None = None,
     parent_version_id: str | None = None,
-    patch_json: str | None = None,
+    patch_json: str | dict[str, Any] | None = None,
 ) -> SpecVersion:
     """Save a new SpecVersion, marking previous ones as not-current."""
-    result = await db.execute(
-        select(SpecVersion.version)
-        .where(SpecVersion.session_id == session_id)
-        .order_by(SpecVersion.version.desc())
-        .limit(1)
-    )
-    latest = result.scalar_one_or_none()
-    next_version = (latest or 0) + 1
+    if isinstance(spec_json, dict):
+        spec_json = json.dumps(spec_json)
+    if isinstance(validation_result, dict):
+        validation_result = json.dumps(validation_result)
+    if isinstance(patch_json, dict):
+        patch_json = json.dumps(patch_json)
 
-    await db.execute(
-        update(SpecVersion).where(SpecVersion.session_id == session_id).values(is_current=False)
-    )
+    try:
+        result = await db.execute(
+            select(SpecVersion.version)
+            .where(SpecVersion.session_id == session_id)
+            .order_by(SpecVersion.version.desc())
+            .limit(1)
+        )
+        latest = result.scalar_one_or_none()
+        next_version = (latest or 0) + 1
 
-    spec = SpecVersion(
-        id=str(uuid.uuid4()),
-        session_id=session_id,
-        parent_version_id=parent_version_id,
-        version=next_version,
-        spec_json=spec_json,
-        patch_json=patch_json,
-        validation_result=validation_result,
-        is_current=True,
-    )
-    db.add(spec)
-    await db.commit()
-    await db.refresh(spec)
-    return spec
+        await db.execute(
+            update(SpecVersion).where(SpecVersion.session_id == session_id).values(is_current=False)
+        )
+
+        spec = SpecVersion(
+            id=str(uuid.uuid4()),
+            session_id=session_id,
+            parent_version_id=parent_version_id,
+            version=next_version,
+            spec_json=spec_json,
+            patch_json=patch_json,
+            validation_result=validation_result,
+            is_current=True,
+        )
+        db.add(spec)
+        await db.commit()
+        await db.refresh(spec)
+        return spec
+    except Exception:
+        await db.rollback()
+        raise
 
 
 async def get_current_spec(db: AsyncSession, session_id: str) -> SpecVersion | None:

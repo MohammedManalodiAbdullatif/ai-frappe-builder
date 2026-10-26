@@ -19,11 +19,18 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from models import AppSpec, DocTypeSpec, PermissionSpec, WorkflowSpec, ServerScriptSpec, ClientScriptSpec
-from frappe_client import FrappeClient, FrappeAPIError
-import script_generator
 import report_builder
 import run_tests
+import script_generator
+from frappe_client import FrappeAPIError, FrappeClient
+from models import (
+    AppSpec,
+    ClientScriptSpec,
+    DocTypeSpec,
+    PermissionSpec,
+    ServerScriptSpec,
+    WorkflowSpec,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -182,8 +189,38 @@ async def apply_spec(
             "preview_urls": [],
         }
 
-    app_roles: list[str] = spec.app.get("roles", [])
-    sample_data: dict = spec.app.get("sample_data", {})
+    app_roles: list[str] = (
+        spec.app.get("roles", [])
+        if isinstance(spec.app, dict)
+        else (spec.app.roles if spec.app else [])
+    )
+    sample_data: dict = (
+        spec.app.get("sample_data", {})
+        if isinstance(spec.app, dict)
+        else (getattr(spec.app, "sample_data", {}) if spec.app else {})
+    )
+
+    # ---------------------------------------------------------------
+    # Step 0 — Ensure Modules Exist
+    # ---------------------------------------------------------------
+    app_modules: set[str] = set()
+    if isinstance(spec.app, dict):
+        app_modules.update(spec.app.get("modules") or [])
+    elif spec.app:
+        app_modules.update(spec.app.modules or [])
+    for dt in doctypes:
+        if dt.module:
+            app_modules.add(dt.module)
+
+    for mod in sorted(app_modules):
+        try:
+            exists = await frappe_client.module_exists(mod)
+            if not exists:
+                await frappe_client.create_module(mod)
+                created.append(f"Module: {mod}")
+                logger.info("Created missing module: %s", mod)
+        except Exception as exc:
+            logger.warning("Could not verify or create module '%s': %s", mod, exc)
 
     # ---------------------------------------------------------------
     # Step 1 — Create Roles

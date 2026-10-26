@@ -29,6 +29,8 @@ class ChatResponse(BaseModel):
     questions: list[dict[str, Any]] = []
     assumptions: list[str] = []
     spec: dict[str, Any] | None = None
+    interview_turn: dict[str, Any] | None = None
+    coverage: dict[str, float] | None = None
 
 
 class PlanResponse(BaseModel):

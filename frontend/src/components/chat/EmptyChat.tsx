@@ -14,9 +14,9 @@ const EXAMPLE_PROMPTS = [
 
 export const EmptyChat: React.FC<EmptyChatProps> = ({ onSelectPrompt }) => {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none">
-      <div className="max-w-md w-full flex flex-col items-center gap-6">
-        <h1 className="text-xl font-semibold text-[var(--text)]">
+    <div className="flex-1 flex flex-col items-center justify-start pt-20 sm:pt-24 px-4 text-center select-none">
+      <div className="max-w-[760px] w-full flex flex-col items-center gap-6">
+        <h1 className="text-xl font-semibold text-[var(--text)] tracking-tight">
           What are you building?
         </h1>
 
@@ -24,11 +24,15 @@ export const EmptyChat: React.FC<EmptyChatProps> = ({ onSelectPrompt }) => {
           {EXAMPLE_PROMPTS.map((prompt) => (
             <button
               key={prompt}
+              type="button"
               onClick={() => onSelectPrompt(prompt)}
-              className="flex items-center justify-between p-3.5 text-left bg-[var(--surface)] hover:border-[var(--accent)] border border-[var(--border)] rounded-card text-sm text-[var(--text)] transition-colors group"
+              className="flex items-center justify-between p-3.5 text-left bg-[var(--surface)] hover:bg-[var(--surface-hover)] hover:border-[var(--accent)] border border-[var(--border)] rounded-card text-sm text-[var(--text)] transition-colors group"
             >
-              <span>{prompt}</span>
-              <ArrowUpRight className="w-4 h-4 text-[var(--muted)] group-hover:text-[var(--accent)] transition-colors" strokeWidth={1.5} />
+              <span className="font-medium">{prompt}</span>
+              <ArrowUpRight
+                className="w-4 h-4 text-[var(--muted)] group-hover:text-[var(--accent)] transition-colors flex-shrink-0"
+                strokeWidth={1.5}
+              />
             </button>
           ))}
         </div>

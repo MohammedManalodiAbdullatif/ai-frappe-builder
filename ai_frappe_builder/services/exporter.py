@@ -329,65 +329,104 @@ def daily():
         # -------------------------------------------------------------------
         fixtures_dir = f"{app_name}/fixtures"
 
-        # Roles fixture
-        roles_fixture = [
-            {"doctype": "Role", "role_name": r, "desk_access": 1}
-            for r in app.roles
-            if r != "System Manager"
-        ]
-        _write(f"{fixtures_dir}/role.json", json.dumps(roles_fixture, indent=1))
-
         # Workflows fixture
-        workflows_fixture = []
-        workflow_states_set: set[str] = set()
+        workflows_fixture: list[dict[str, Any]] = []
+        workflow_states_map: dict[str, str] = {}
         workflow_actions_set: set[str] = set()
+        workflow_roles_set: set[str] = set()
 
         for wf in app.workflows:
-            wf_dict = {
+            states_rows: list[dict[str, Any]] = []
+            for s in wf.states:
+                row: dict[str, Any] = {
+                    "allow_edit": s.allow_edit,
+                    "doc_status": str(s.doc_status),
+                    "doctype": "Workflow Document State",
+                    "state": s.state,
+                    "style": s.style or "",
+                }
+                if s.update_field:
+                    row["update_field"] = s.update_field
+                if s.update_value:
+                    row["update_value"] = s.update_value
+                states_rows.append(row)
+                workflow_states_map[s.state] = s.style or ""
+                if s.allow_edit:
+                    workflow_roles_set.add(s.allow_edit)
+
+            transitions_rows: list[dict[str, Any]] = []
+            for t in wf.transitions:
+                t_row: dict[str, Any] = {
+                    "action": t.action,
+                    "allow_self_approval": t.allow_self_approval,
+                    "allowed": t.allowed,
+                    "doctype": "Workflow Transition",
+                    "next_state": t.next_state,
+                    "state": t.state,
+                }
+                if t.condition:
+                    t_row["condition"] = t.condition
+                transitions_rows.append(t_row)
+                workflow_actions_set.add(t.action)
+                if t.allowed:
+                    workflow_roles_set.add(t.allowed)
+
+            wf_dict: dict[str, Any] = {
                 "doctype": "Workflow",
-                "workflow_name": wf.name,
                 "document_type": wf.document_type,
-                "workflow_state_field": wf.workflow_state_field,
                 "is_active": 1 if wf.is_active else 0,
-                "states": [
-                    {
-                        "state": s.state,
-                        "doc_status": str(s.doc_status),
-                        "allow_edit": s.allow_edit,
-                    }
-                    for s in wf.states
-                ],
-                "transitions": [
-                    {
-                        "state": t.state,
-                        "action": t.action,
-                        "next_state": t.next_state,
-                        "allowed": t.allowed,
-                    }
-                    for t in wf.transitions
-                ],
+                "send_email_alert": 1 if wf.send_email_alert else 0,
+                "states": states_rows,
+                "transitions": transitions_rows,
+                "workflow_name": wf.name,
+                "workflow_state_field": wf.workflow_state_field or "workflow_state",
             }
             workflows_fixture.append(wf_dict)
-            for s in wf.states:
-                workflow_states_set.add(s.state)
-            for t in wf.transitions:
-                workflow_actions_set.add(t.action)
 
-        _write(f"{fixtures_dir}/workflow.json", json.dumps(workflows_fixture, indent=1))
+        # Byte-stable workflows fixture (1-space indented, sorted keys, \n-terminated)
+        _write(
+            f"{fixtures_dir}/workflow.json",
+            json.dumps(workflows_fixture, indent=1, sort_keys=True) + "\n",
+        )
 
-        # Workflow States fixture
+        # Byte-stable workflow states fixture
         states_fixture = [
-            {"doctype": "Workflow State", "workflow_state_name": st}
-            for st in sorted(workflow_states_set)
+            {
+                "doctype": "Workflow State",
+                "style": workflow_states_map[st],
+                "workflow_state_name": st,
+            }
+            for st in sorted(workflow_states_map.keys())
         ]
-        _write(f"{fixtures_dir}/workflow_state.json", json.dumps(states_fixture, indent=1))
+        _write(
+            f"{fixtures_dir}/workflow_state.json",
+            json.dumps(states_fixture, indent=1, sort_keys=True) + "\n",
+        )
 
-        # Workflow Actions fixture
+        # Byte-stable workflow actions fixture
         actions_fixture = [
-            {"doctype": "Workflow Action Master", "workflow_action_name": act}
+            {
+                "doctype": "Workflow Action Master",
+                "workflow_action_name": act,
+            }
             for act in sorted(workflow_actions_set)
         ]
-        _write(f"{fixtures_dir}/workflow_action_master.json", json.dumps(actions_fixture, indent=1))
+        _write(
+            f"{fixtures_dir}/workflow_action_master.json",
+            json.dumps(actions_fixture, indent=1, sort_keys=True) + "\n",
+        )
+
+        # Roles fixture: ensure every workflow role is in it
+        all_roles_set = set(app.roles) | workflow_roles_set
+        role_names = sorted([r for r in all_roles_set if r != "System Manager"])
+        roles_fixture = [
+            {"desk_access": 1, "doctype": "Role", "role_name": r}
+            for r in role_names
+        ]
+        _write(
+            f"{fixtures_dir}/role.json",
+            json.dumps(roles_fixture, indent=1, sort_keys=True) + "\n",
+        )
 
         # -------------------------------------------------------------------
         # 4. DocTypes (<app_name>/<app_name>/<module>/doctype/<dt>/)
@@ -405,7 +444,8 @@ def daily():
             _write(f"{dt_dir}/{dt_snake}.json", json.dumps(dt_json, indent=1))
 
             # Controller Python (<dt>.py)
-            code_bundle = self.script_writer.generate_doctype_bundle(dt)
+            wf_for_dt = next((w for w in app.workflows if w.document_type == dt.name), None)
+            code_bundle = self.script_writer.generate_doctype_bundle(dt, workflow=wf_for_dt)
             _write(f"{dt_dir}/{dt_snake}.py", code_bundle.controller_python)
 
             # Client Script JS (<dt>.js)
@@ -443,20 +483,19 @@ def daily():
         if app.requires_erpnext:
             required_apps_block = 'required_apps = ["erpnext"]\n'
 
+        wf_names = sorted([w.name for w in app.workflows])
+        wf_state_names = sorted(workflow_states_map.keys())
+        wf_action_names = sorted(workflow_actions_set)
+
         fixtures_list: list[dict[str, Any]] = [
-            {"dt": "Role", "filters": [["name", "in", app.roles]]},
+            {"dt": "Role", "filters": [["name", "in", role_names]]},
         ]
         if app.workflows:
             fixtures_list.extend(
                 [
-                    {
-                        "dt": "Workflow",
-                        "filters": [
-                            ["document_type", "in", [w.document_type for w in app.workflows]]
-                        ],
-                    },
-                    {"dt": "Workflow State"},
-                    {"dt": "Workflow Action Master"},
+                    {"dt": "Workflow", "filters": [["name", "in", wf_names]]},
+                    {"dt": "Workflow State", "filters": [["name", "in", wf_state_names]]},
+                    {"dt": "Workflow Action Master", "filters": [["name", "in", wf_action_names]]},
                 ]
             )
 

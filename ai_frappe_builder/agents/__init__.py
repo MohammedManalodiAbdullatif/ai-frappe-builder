@@ -7,7 +7,14 @@ from ai_frappe_builder.agents.base import BaseAgent
 from ai_frappe_builder.agents.differ import DifferAgent, DifferInput
 from ai_frappe_builder.agents.documenter import DocumentationBundle, Documenter
 from ai_frappe_builder.agents.healer import HealerAgent, HealerInput
-from ai_frappe_builder.agents.interviewer import InterviewerAgent, InterviewInput, InterviewTurn
+from ai_frappe_builder.agents.interviewer import (
+    CoverageSpec,
+    InterviewerAgent,
+    InterviewInput,
+    InterviewTurn,
+    OptionSpec,
+    QuestionSpec,
+)
 from ai_frappe_builder.agents.orchestrator import (
     Orchestrator,
     OrchestratorSession,
@@ -19,6 +26,7 @@ __all__ = [
     "ArchitectAgent",
     "ArchitectInput",
     "BaseAgent",
+    "CoverageSpec",
     "DifferAgent",
     "DifferInput",
     "DocumentationBundle",
@@ -28,10 +36,12 @@ __all__ = [
     "InterviewInput",
     "InterviewTurn",
     "InterviewerAgent",
+    "OptionSpec",
     "Orchestrator",
     "OrchestratorSession",
     "OrchestratorState",
     "QAAgent",
     "QAInput",
     "QAReport",
+    "QuestionSpec",
 ]

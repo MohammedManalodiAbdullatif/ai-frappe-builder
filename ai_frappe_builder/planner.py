@@ -15,9 +15,8 @@ import json
 import logging
 from typing import Any
 
+import decide
 import httpx
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from config import settings
 from database import (
     Message,
@@ -27,7 +26,7 @@ from database import (
     update_session_status,
 )
 from models import AppSpec
-import decide
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 

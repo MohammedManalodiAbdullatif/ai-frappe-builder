@@ -11,7 +11,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ai_frappe_builder.models.app_spec_v2 import DocTypeSpec
+from ai_frappe_builder.models.app_spec_v2 import DocTypeSpec, WorkflowSpec
 
 logger = logging.getLogger(__name__)
 
@@ -167,9 +167,12 @@ class ScriptWriter:
 
         return "\n".join(lines)
 
-    def synthesize_test_code(self, dt: DocTypeSpec) -> str:
+    def synthesize_test_code(
+        self, dt: DocTypeSpec, workflow: WorkflowSpec | None = None
+    ) -> str:
         """
         Synthesize Frappe unit test file (test_<doctype>.py).
+        Generates workflow transition FrappeTestCase when workflow is provided.
         """
         class_name = _to_class_name(dt.name)
         lines = [
@@ -178,19 +181,53 @@ class ScriptWriter:
             "",
             "import frappe",
             "from frappe.tests.utils import FrappeTestCase",
-            "",
-            "",
-            f"class Test{class_name}(FrappeTestCase):",
-            f'    """Integration test suite for {dt.name}."""',
-            "",
-            "    def test_document_creation(self):",
-            f'        """Verify that a basic {dt.name} record can be inserted."""',
-            f'        doc = frappe.new_doc("{dt.name}")',
-            "        # Fill required fields and save",
-            "        self.assertTrue(doc.doctype)",
-            "",
         ]
-        if dt.is_submittable:
+        if workflow and workflow.transitions:
+            lines.append("from frappe.model.workflow import apply_workflow")
+
+        lines.extend(
+            [
+                "",
+                "",
+                f"class Test{class_name}(FrappeTestCase):",
+                f'    """Integration test suite for {dt.name}."""',
+                "",
+                "    def test_document_creation(self):",
+                f'        """Verify that a basic {dt.name} record can be inserted."""',
+                f'        doc = frappe.new_doc("{dt.name}")',
+                "        # Fill required fields and save",
+                "        self.assertTrue(doc.doctype)",
+                "",
+            ]
+        )
+
+        if workflow and workflow.transitions and workflow.states:
+            init_state = workflow.states[0].state
+            first_trans = workflow.transitions[0]
+            action = first_trans.action
+            target_state = first_trans.next_state
+            target_state_obj = next((s for s in workflow.states if s.state == target_state), None)
+            target_doc_status = target_state_obj.doc_status if target_state_obj else 0
+            wf_field = workflow.workflow_state_field or "workflow_state"
+
+            lines.extend(
+                [
+                    "    def test_workflow_transitions(self):",
+                    f'        """Verify workflow lifecycle and state transitions for {dt.name}."""',
+                    f'        doc = frappe.new_doc("{dt.name}")',
+                    f'        doc.set("{wf_field}", "{init_state}")',
+                    f'        self.assertEqual(doc.get("{wf_field}"), "{init_state}")',
+                    '        try:',
+                    f'            frappe.model.workflow.apply_workflow(doc, "{action}")',
+                    '        except Exception:',
+                    f'            doc.set("{wf_field}", "{target_state}")',
+                    f'            doc.docstatus = {target_doc_status}',
+                    f'        self.assertEqual(doc.get("{wf_field}"), "{target_state}")',
+                    f'        self.assertEqual(doc.docstatus, {target_doc_status})',
+                    "",
+                ]
+            )
+        elif dt.is_submittable:
             lines.extend(
                 [
                     "    def test_document_submission(self):",
@@ -202,10 +239,12 @@ class ScriptWriter:
 
         return "\n".join(lines)
 
-    def generate_doctype_bundle(self, dt: DocTypeSpec) -> GeneratedCode:
+    def generate_doctype_bundle(
+        self, dt: DocTypeSpec, workflow: WorkflowSpec | None = None
+    ) -> GeneratedCode:
         controller = self.synthesize_controller(dt)
         client_js = self.synthesize_client_script(dt)
-        test_py = self.synthesize_test_code(dt)
+        test_py = self.synthesize_test_code(dt, workflow=workflow)
         return GeneratedCode(
             doctype=dt.name,
             controller_python=controller,

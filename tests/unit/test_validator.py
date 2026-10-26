@@ -55,10 +55,14 @@ def _build_valid_car_rental_spec() -> AppSpecV2:
             ),
             FieldSpec(fieldname="start_date", label="Start Date", fieldtype="Date", reqd=True),
             FieldSpec(
-                fieldname="status",
-                label="Status",
+                fieldname="workflow_state",
+                label="Workflow State",
                 fieldtype="Select",
-                options="Draft\nActive\nCompleted",
+                options="Draft\nActive",
+                read_only=True,
+                in_list_view=True,
+                in_standard_filter=True,
+                allow_on_submit=True,
             ),
         ],
         permissions=[
@@ -166,7 +170,7 @@ def test_submittable_consistency_mismatch() -> None:
     spec.app.doctypes[1].is_submittable = False
     report = validate_spec(spec)
     assert report.is_valid is False
-    assert any("workflow_submittable_mismatch" in e for e in report.errors)
+    assert any("workflow_submittable_mismatch" in e or "WF007" in e for e in report.errors)
 
 
 def test_circular_mandatory_links_detected() -> None:

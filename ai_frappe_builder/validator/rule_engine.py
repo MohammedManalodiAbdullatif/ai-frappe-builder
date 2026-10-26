@@ -99,7 +99,7 @@ class RuleEngine:
                 )
 
         # Cross-DocType & Workflow validation
-        validate_workflows(spec.app.workflows, doctypes_map, report)
+        validate_workflows(spec.app.workflows, doctypes_map, spec.app.roles, report)
         validate_circular_mandatory_links(doctypes, report)
 
         return report

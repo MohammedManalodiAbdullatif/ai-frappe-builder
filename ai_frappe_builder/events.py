@@ -19,11 +19,16 @@ logger = logging.getLogger(__name__)
 EventType = Literal[
     "token",
     "question",
+    "interview_turn",
+    "message",
     "state_change",
+    "stage_transition",
     "spec_patch",
     "validation",
     "qa_progress",
     "artifact_ready",
+    "qa_report",
+    "subagent_activity",
     "error",
 ]
 

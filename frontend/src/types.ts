@@ -11,6 +11,45 @@ export type PipelineStage =
   | 'done'
   | 'failed';
 
+export interface SubagentActivity {
+  agent: string;
+  role: string;
+  status: 'active' | 'completed' | 'idle' | 'failed';
+  action: string;
+  timestamp?: string;
+}
+
+export interface OptionSpec {
+  value: string;
+  label: string;
+  description?: string | null;
+}
+
+export type DiscoveryPhase = 'basics' | 'domain' | 'confirm';
+
+export interface QuestionSpec {
+  id: string;
+  phase: DiscoveryPhase;
+  text: string;
+  help?: string | null;
+  input: 'single' | 'multi' | 'text' | 'yesno';
+  options?: OptionSpec[] | null;
+  allow_custom?: boolean;
+}
+
+export interface CoverageSpec {
+  basics: number;
+  domain: number;
+}
+
+export interface InterviewTurn {
+  kind: 'question' | 'summary' | 'done';
+  say: string;
+  question?: QuestionSpec | null;
+  assumptions: string[];
+  coverage: CoverageSpec;
+}
+
 export interface QuestionOption {
   label: string;
   value: string;
@@ -36,6 +75,7 @@ export interface FieldSpec {
   hidden?: boolean;
   in_list_view?: boolean;
   in_standard_filter?: boolean;
+  allow_on_submit?: boolean;
   default?: string;
   fetch_from?: string;
   depends_on?: string;
@@ -67,8 +107,11 @@ export interface DocTypeSpec {
 
 export interface WorkflowState {
   state: string;
-  doc_status: number;
+  doc_status: 0 | 1 | 2;
+  style?: 'Success' | 'Warning' | 'Danger' | 'Primary' | '';
   allow_edit: string;
+  update_field?: string | null;
+  update_value?: string | null;
 }
 
 export interface WorkflowTransition {
@@ -76,12 +119,15 @@ export interface WorkflowTransition {
   action: string;
   next_state: string;
   allowed: string;
+  condition?: string | null;
+  allow_self_approval?: 0 | 1;
 }
 
 export interface WorkflowSpec {
   name: string;
   document_type: string;
   workflow_state_field?: string;
+  is_active?: 0 | 1;
   states: WorkflowState[];
   transitions: WorkflowTransition[];
 }
@@ -139,6 +185,8 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
+  interview_turn?: InterviewTurn;
+  answeredAnswer?: string | null;
 }
 
 export interface FileNode {

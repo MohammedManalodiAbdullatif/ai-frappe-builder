@@ -1,8 +1,16 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { Workspace } from '../components/workspace/Workspace';
 import { AppMetadata } from '../types';
+
+beforeEach(() => {
+  (globalThis as any).ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+});
 
 describe('Workspace Component', () => {
   const mockApp: AppMetadata = {
@@ -57,8 +65,7 @@ describe('Workspace Component', () => {
     expect(screen.getByText('Spec')).toBeDefined();
 
     // In discovery stage with no validation yet:
-    expect(screen.getByText('—')).toBeDefined();
-    expect(screen.getByText('Not run yet')).toBeDefined();
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
 
     // Download button must be disabled until stage is Ready (done)
     const downloadBtn = screen.getByText('Download .zip').closest('button');
@@ -75,6 +82,7 @@ describe('Workspace Component', () => {
         sessionId="test-session"
         stage="done"
         validation={{ is_valid: true, errors: [], warnings: [], fix_hints: [] }}
+        qaReport={{ execution_mode: 'static_only', passed: false }}
       />
     );
 
@@ -85,7 +93,7 @@ describe('Workspace Component', () => {
 
     // In ready stage with validation run:
     expect(screen.getByText('Valid')).toBeDefined();
-    expect(screen.getByText('Passed')).toBeDefined();
+    expect(screen.getByText('static-only')).toBeDefined();
     const downloadBtn = screen.getByText('Download .zip').closest('button');
     expect(downloadBtn?.disabled).toBe(false);
   });

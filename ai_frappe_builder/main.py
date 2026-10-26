@@ -26,22 +26,21 @@ import json
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from database import init_db, get_db, create_session, add_message, get_messages, get_current_spec
-from database import get_session as db_get_session
-from routers import apply, chat, events, export, plan
+import applier
 import planner
 import validator
-import applier
+from database import Session as DBSession
+from database import add_message, create_session, get_current_spec, get_db, get_messages, init_db
+from database import get_session as db_get_session
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from frappe_client import FrappeClient
 from models import AppSpec
+from pydantic import BaseModel
+from routers import apply, chat, events, export, plan
 from sqlalchemy import select
-from database import Session as DBSession, Message as DBMessage
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logging.basicConfig(
     level=logging.INFO,
@@ -152,7 +151,7 @@ async def list_sessions(db: AsyncSession = Depends(get_db)):
 
 @app.get("/sessions/{session_id}", tags=["Sessions"])
 async def get_session_detail(session_id: str, db: AsyncSession = Depends(get_db)):
-    """Get full detail for one session including messages and current spec."""
+    """Get full detail for one session including messages, active question, and current spec."""
     sess = await db_get_session(db, session_id)
     if not sess:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -172,21 +171,66 @@ async def get_session_detail(session_id: str, db: AsyncSession = Depends(get_db)
             ),
         }
 
+    # Hydrate or retrieve orchestrator session state
+    from ai_frappe_builder.agents.orchestrator import (
+        BASICS_SCRIPT,
+        get_or_create_orchestrator_session,
+        hydrate_orchestrator_session,
+    )
+
+    orch_session = get_or_create_orchestrator_session(session_id)
+    await hydrate_orchestrator_session(orch_session, db)
+
+    active_turn_dict = None
+    if orch_session.last_turn:
+        active_turn_dict = orch_session.last_turn.model_dump()
+    elif orch_session.discovery_phase == "basics":
+        pending = [q for q in BASICS_SCRIPT if q.id not in orch_session.answered_basics]
+        if pending:
+            active_q = pending[0]
+            last_asst_content = (
+                messages[-1].content
+                if messages and messages[-1].role == "assistant"
+                else "Please clarify the following question:"
+            )
+            active_turn_dict = {
+                "kind": "question",
+                "say": last_asst_content,
+                "question": active_q.model_dump(),
+                "assumptions": orch_session.assumptions,
+                "coverage": orch_session.coverage.model_dump(),
+            }
+
+    formatted_messages = []
+    for idx, m in enumerate(messages):
+        m_dict = {
+            "id": m.id,
+            "role": m.role,
+            "content": m.content,
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+        }
+        # Attach active interview turn to the latest assistant message if in discovery
+        if (
+            idx == len(messages) - 1
+            and m.role == "assistant"
+            and active_turn_dict
+            and str(orch_session.state).lower() == "discovery"
+        ):
+            m_dict["interview_turn"] = active_turn_dict
+        formatted_messages.append(m_dict)
+
     return {
         "session_id": sess.id,
         "client_name": sess.client_name,
         "status": sess.status,
         "frappe_url": sess.frappe_url,
         "created_at": sess.created_at.isoformat() if sess.created_at else None,
-        "messages": [
-            {
-                "role": m.role,
-                "content": m.content,
-                "created_at": m.created_at.isoformat() if m.created_at else None,
-            }
-            for m in messages
-        ],
+        "messages": formatted_messages,
         "current_spec": spec_data,
+        "active_question": active_turn_dict.get("question") if active_turn_dict else None,
+        "interview_turn": active_turn_dict,
+        "coverage": orch_session.coverage.model_dump(),
+        "assumptions": orch_session.assumptions,
     }
 
 
